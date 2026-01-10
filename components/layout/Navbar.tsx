@@ -8,9 +8,10 @@ import { Button } from '../ui/Button';
 
 interface NavbarProps {
   onNavigateLogin: () => void;
+  onNavigateSignup: () => void;
 }
 
-export const Navbar = ({ onNavigateLogin }: NavbarProps) => {
+export const Navbar = ({ onNavigateLogin, onNavigateSignup }: NavbarProps) => {
   const { theme, toggleTheme } = useTheme();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -74,7 +75,10 @@ export const Navbar = ({ onNavigateLogin }: NavbarProps) => {
             >
               {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
             </button>
-            <Button variant="primary" className="h-10 px-5 text-sm" onClick={onNavigateLogin}>
+            <button onClick={onNavigateLogin} className="text-sm font-medium hover:text-purple-600 dark:hover:text-purple-400 bg-transparent border-none cursor-pointer transition-colors">
+              Log in
+            </button>
+            <Button variant="primary" className="h-10 px-5 text-sm" onClick={onNavigateSignup}>
               Get Started
             </Button>
           </div>
@@ -114,7 +118,8 @@ export const Navbar = ({ onNavigateLogin }: NavbarProps) => {
                   {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
                 </button>
               </div>
-              <Button className="w-full" onClick={onNavigateLogin}>Get Started</Button>
+              <Button className="w-full" onClick={onNavigateSignup}>Get Started</Button>
+              <button onClick={onNavigateLogin} className="w-full p-2 font-medium text-center hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg">Log in</button>
             </div>
           </motion.div>
         )}

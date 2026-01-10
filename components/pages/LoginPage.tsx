@@ -21,9 +21,11 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 interface LoginPageProps {
   onBack: () => void;
+  onNavigateSignup: () => void;
+  onLoginSuccess: () => void;
 }
 
-export const LoginPage = ({ onBack }: LoginPageProps) => {
+export const LoginPage = ({ onBack, onNavigateSignup, onLoginSuccess }: LoginPageProps) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const {
@@ -45,6 +47,10 @@ export const LoginPage = ({ onBack }: LoginPageProps) => {
       if (error) throw error;
 
       toast.success(`Welcome back!`);
+      // Add a slight delay to show the toast before transition
+      setTimeout(() => {
+        onLoginSuccess();
+      }, 500);
     } catch (error: any) {
       toast.error(error.message || "Invalid credentials");
     } finally {
@@ -170,7 +176,7 @@ export const LoginPage = ({ onBack }: LoginPageProps) => {
           </motion.button>
 
           <p className="mt-8 text-center text-sm text-gray-500">
-            Don't have an account? <a href="#" className="text-black font-medium hover:underline">Sign up for free</a>
+            Don't have an account? <button onClick={onNavigateSignup} className="text-black font-medium hover:underline">Sign up for free</button>
           </p>
         </motion.div>
       </div>
