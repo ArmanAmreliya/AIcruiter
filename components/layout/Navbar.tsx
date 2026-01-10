@@ -6,7 +6,11 @@ import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
 import { Button } from '../ui/Button';
 
-export const Navbar = () => {
+interface NavbarProps {
+  onNavigateLogin: () => void;
+}
+
+export const Navbar = ({ onNavigateLogin }: NavbarProps) => {
   const { theme, toggleTheme } = useTheme();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -70,7 +74,7 @@ export const Navbar = () => {
             >
               {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
             </button>
-            <Button variant="primary" className="h-10 px-5 text-sm">
+            <Button variant="primary" className="h-10 px-5 text-sm" onClick={onNavigateLogin}>
               Get Started
             </Button>
           </div>
@@ -110,7 +114,7 @@ export const Navbar = () => {
                   {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
                 </button>
               </div>
-              <Button className="w-full">Get Started</Button>
+              <Button className="w-full" onClick={onNavigateLogin}>Get Started</Button>
             </div>
           </motion.div>
         )}
