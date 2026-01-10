@@ -1,6 +1,25 @@
-
 import React from 'react';
 import { Star } from 'lucide-react';
+
+const TestimonialCard: React.FC<{ t: any }> = ({ t }) => (
+  <div className="w-[400px] p-6 rounded-2xl bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 shrink-0 mx-4 whitespace-normal shadow-sm hover:shadow-md transition-shadow">
+    <div className="flex gap-1 mb-4">
+      {[1, 2, 3, 4, 5].map((s) => (
+        <Star key={s} size={18} className="fill-black dark:fill-white text-black dark:text-white" />
+      ))}
+    </div>
+    <p className="text-zinc-800 dark:text-zinc-200 font-medium text-lg leading-relaxed mb-6">
+      "{t.text}"
+    </p>
+    <div className="flex items-center gap-3">
+      <img src={t.avatar} alt={t.name} className="w-10 h-10 rounded-full object-cover bg-zinc-100 dark:bg-zinc-800" />
+      <div>
+        <div className="font-bold text-black dark:text-white text-sm">{t.name}</div>
+        <div className="text-zinc-500 text-xs">{t.role}</div>
+      </div>
+    </div>
+  </div>
+);
 
 export const TestimonialsSection = () => {
   const testimonialsTop = [
@@ -56,26 +75,6 @@ export const TestimonialsSection = () => {
       avatar: "https://i.pravatar.cc/150?u=8"
     }
   ];
-
-  const TestimonialCard = ({ t }: { t: any }) => (
-    <div className="w-[400px] p-6 rounded-2xl bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 shrink-0 mx-4 whitespace-normal shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex gap-1 mb-4">
-        {[1, 2, 3, 4, 5].map((s) => (
-          <Star key={s} size={18} className="fill-black dark:fill-white text-black dark:text-white" />
-        ))}
-      </div>
-      <p className="text-zinc-800 dark:text-zinc-200 font-medium text-lg leading-relaxed mb-6">
-        "{t.text}"
-      </p>
-      <div className="flex items-center gap-3">
-        <img src={t.avatar} alt={t.name} className="w-10 h-10 rounded-full object-cover bg-zinc-100 dark:bg-zinc-800" />
-        <div>
-          <div className="font-bold text-black dark:text-white text-sm">{t.name}</div>
-          <div className="text-zinc-500 text-xs">{t.role}</div>
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <section id="testimonials" className="py-24 bg-white dark:bg-black relative overflow-hidden">

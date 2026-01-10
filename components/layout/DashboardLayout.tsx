@@ -20,22 +20,25 @@ import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
 
 interface DashboardLayoutProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   onLogout: () => void;
+  onCreateJob: () => void;
 }
 
-const SidebarItem = ({ 
+interface SidebarItemProps { 
+  icon: any; 
+  label: string; 
+  active?: boolean; 
+  onClick?: () => void;
+  theme: string;
+}
+
+const SidebarItem: React.FC<SidebarItemProps> = ({ 
   icon: Icon, 
   label, 
   active = false, 
   onClick,
   theme 
-}: { 
-  icon: any, 
-  label: string, 
-  active?: boolean, 
-  onClick?: () => void,
-  theme: string
 }) => {
   return (
     <motion.button
@@ -67,7 +70,7 @@ const SidebarItem = ({
   );
 };
 
-export const DashboardLayout = ({ children, onLogout }: DashboardLayoutProps) => {
+export const DashboardLayout = ({ children, onLogout, onCreateJob }: DashboardLayoutProps) => {
   const { theme, toggleTheme } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
@@ -278,6 +281,7 @@ export const DashboardLayout = ({ children, onLogout }: DashboardLayoutProps) =>
              <div className="h-6 w-px bg-current opacity-10 mx-1"></div>
 
              <motion.button
+               onClick={onCreateJob}
                whileTap={{ scale: 0.95 }}
                className={cn(
                  "hidden sm:flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold shadow-lg transition-transform",

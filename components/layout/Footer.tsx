@@ -35,9 +35,12 @@ export const Footer = () => {
           <div className="col-span-1 md:col-span-2">
             <h4 className="font-bold text-lg mb-6">Product</h4>
             <ul className="space-y-4 text-gray-400">
-              {['Features', 'Pricing', 'Blog', 'Reviews', 'FAQs', 'Contact'].map(link => (
-                <li key={link}><a href="#" className="hover:text-white transition-colors">{link}</a></li>
-              ))}
+              <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
+              <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
+              <li><a href="#testimonials" className="hover:text-white transition-colors">Reviews</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">FAQs</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
             </ul>
           </div>
           

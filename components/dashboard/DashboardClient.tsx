@@ -1,136 +1,146 @@
 
+'use client';
+
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, Sparkles, ArrowRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
+import { useAiCruiter } from '../../hooks/use-aicruiter';
 import { StatsGrid } from './StatsGrid';
 import { VolumeChart } from './VolumeChart';
 import { ActivityFeed, ActivityItem } from './ActivityFeed';
-import type { DashboardStats } from '../../app/actions/dashboard';
 
 interface DashboardClientProps {
-  initialStats: DashboardStats;
-  userName?: string;
+  onNavigateCreateJob?: () => void;
 }
 
-export const DashboardClient = ({ initialStats, userName = "Alex" }: DashboardClientProps) => {
+export const DashboardClient = ({ onNavigateCreateJob }: DashboardClientProps) => {
   const { theme } = useTheme();
+  const { user, jobs, recentActivity, stats } = useAiCruiter();
+
+  // Map strict Activity domain entity to ActivityItem prop for ActivityFeed
+  const mappedActivityFeed: ActivityItem[] = recentActivity.map(a => ({
+    id: a.id,
+    type: a.type,
+    title: a.message, // Map 'message' from domain to 'title' in UI
+    subtitle: a.subtitle,
+    createdAt: a.timestamp, // Map 'timestamp' from domain to 'createdAt' in UI
+    score: a.score,
+    avatarUrl: a.avatarUrl
+  }));
 
   // --- EMPTY STATE CHECK ---
-  // If no active jobs (and presuming no candidates), show the "First Time" Hero.
-  if (initialStats.activeJobs === 0) {
+  if (jobs.length === 0) {
     return (
-       <div className="min-h-[80vh] flex flex-col items-center justify-center text-center font-sans">
+       <div className="min-h-[70vh] flex flex-col items-center justify-center text-center font-sans p-6 animate-fade-in-up">
           <motion.div
              initial={{ scale: 0.8, opacity: 0 }}
              animate={{ scale: 1, opacity: 1 }}
              transition={{ duration: 0.5 }}
-             className="mb-8 relative"
+             className="mb-10 relative"
           >
-             <div className={cn(
-               "w-32 h-32 rounded-[2rem] flex items-center justify-center shadow-2xl",
-               theme === 'light' ? "bg-black text-white" : "bg-white text-black"
-             )}>
-                <Sparkles size={48} />
+             {/* Abstract Bot Illustration */}
+             <div className="relative w-48 h-48 mx-auto">
+                <div className="absolute inset-0 bg-[#6D28D9]/20 rounded-full blur-3xl animate-pulse"></div>
+                <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full relative z-10 drop-shadow-2xl">
+                   <rect x="60" y="80" width="80" height="70" rx="20" className={theme === 'light' ? "fill-black" : "fill-white"} />
+                   <rect x="70" y="40" width="60" height="50" rx="16" className={theme === 'light' ? "fill-black" : "fill-white"} />
+                   <circle cx="85" cy="65" r="5" className={theme === 'light' ? "fill-white animate-blink" : "fill-black animate-blink"} />
+                   <circle cx="115" cy="65" r="5" className={theme === 'light' ? "fill-white animate-blink" : "fill-black animate-blink"} />
+                   <line x1="100" y1="40" x2="100" y2="20" stroke={theme === 'light' ? "black" : "white"} strokeWidth="6" strokeLinecap="round"/>
+                   <circle cx="100" cy="15" r="6" fill="#6D28D9" className="animate-pulse" />
+                   <path d="M50 110 C 30 110, 30 90, 60 90" stroke={theme === 'light' ? "black" : "white"} strokeWidth="8" strokeLinecap="round" fill="none" />
+                   <path d="M150 110 C 170 110, 170 90, 140 90" stroke={theme === 'light' ? "black" : "white"} strokeWidth="8" strokeLinecap="round" fill="none" />
+                </svg>
+                
+                <motion.div 
+                  animate={{ y: [-10, 10, -10] }} 
+                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute -right-8 top-0 bg-white dark:bg-zinc-800 p-3 rounded-2xl shadow-xl border border-black/5 dark:border-white/10"
+                >
+                   <Sparkles size={20} className="text-[#6D28D9]" />
+                </motion.div>
              </div>
-             {/* Decorative Elements */}
-             <div className="absolute -top-4 -right-4 w-12 h-12 rounded-full bg-[#6D28D9] blur-xl opacity-50 animate-pulse"></div>
-             <div className="absolute -bottom-2 -left-2 w-8 h-8 rounded-full bg-blue-500 blur-lg opacity-50"></div>
           </motion.div>
 
-          <motion.h1 
-             initial={{ y: 20, opacity: 0 }}
-             animate={{ y: 0, opacity: 1 }}
-             transition={{ delay: 0.2 }}
-             className={cn("text-4xl md:text-5xl font-bold tracking-tight mb-4", theme === 'light' ? "text-black" : "text-white")}
-          >
+          <h1 className={cn("text-4xl md:text-5xl font-bold tracking-tight mb-4", theme === 'light' ? "text-black" : "text-white")}>
              Ready to hire your first superstar?
-          </motion.h1>
+          </h1>
 
-          <motion.p 
-             initial={{ y: 20, opacity: 0 }}
-             animate={{ y: 0, opacity: 1 }}
-             transition={{ delay: 0.3 }}
-             className={cn("text-xl max-w-xl mx-auto mb-10 leading-relaxed", theme === 'light' ? "text-black/60" : "text-white/60")}
-          >
-             You haven't posted any jobs yet. Create your first AI-screened interview in seconds and let the magic happen.
-          </motion.p>
+          <p className={cn("text-xl max-w-xl mx-auto mb-10 leading-relaxed", theme === 'light' ? "text-black/60" : "text-white/60")}>
+             Create your first AI-screened job post in seconds.
+          </p>
 
-          <motion.button
-             initial={{ y: 20, opacity: 0 }}
-             animate={{ y: 0, opacity: 1 }}
-             whileHover={{ scale: 1.05 }}
-             whileTap={{ scale: 0.95 }}
-             transition={{ delay: 0.4 }}
-             className="group relative px-8 py-4 bg-[#6D28D9] text-white rounded-full font-bold text-lg shadow-xl hover:shadow-2xl hover:shadow-purple-500/20 transition-all flex items-center gap-3"
-          >
-             <span>Create New Interview</span>
-             <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-             <div className="absolute inset-0 rounded-full ring-2 ring-white/20 group-hover:scale-105 transition-transform"></div>
-          </motion.button>
+          {onNavigateCreateJob ? (
+            <motion.button
+               onClick={onNavigateCreateJob}
+               whileHover={{ scale: 1.05 }}
+               whileTap={{ scale: 0.95 }}
+               className="group relative px-10 py-5 bg-[#6D28D9] text-white rounded-full font-bold text-xl shadow-xl hover:shadow-2xl hover:shadow-purple-500/30 transition-all flex items-center gap-4 overflow-hidden"
+            >
+               <span className="relative z-10">Create New Interview</span>
+               <ArrowRight size={24} className="group-hover:translate-x-1 transition-transform relative z-10" />
+               <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+            </motion.button>
+          ) : (
+            <Link to="/dashboard/jobs/new">
+              <motion.button
+                 whileHover={{ scale: 1.05 }}
+                 whileTap={{ scale: 0.95 }}
+                 className="group relative px-10 py-5 bg-[#6D28D9] text-white rounded-full font-bold text-xl shadow-xl hover:shadow-2xl hover:shadow-purple-500/30 transition-all flex items-center gap-4 overflow-hidden"
+              >
+                 <span className="relative z-10">Create New Interview</span>
+                 <ArrowRight size={24} className="group-hover:translate-x-1 transition-transform relative z-10" />
+                 <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+              </motion.button>
+            </Link>
+          )}
        </div>
     );
   }
 
-  // --- NORMAL STATE (Active Dashboard) ---
-  
-  // Simulated initial data for active state
-  const initialActivities: ActivityItem[] = [
-    { 
-      id: 1, 
-      type: 'INTERVIEW',
-      title: "Sarah J. completed interview", 
-      score: 94,
-      avatarUrl: "https://i.pravatar.cc/150?u=sarah",
-      createdAt: new Date(Date.now() - 10 * 60000).toISOString(),
-      subtitle: "Frontend Developer Role"
-    },
-    { 
-      id: 2, 
-      type: 'APPLICATION',
-      title: "New application for Frontend Dev", 
-      subtitle: "Michael Chen applied via LinkedIn",
-      avatarUrl: "https://i.pravatar.cc/150?u=michael",
-      createdAt: new Date(Date.now() - 2 * 3600000).toISOString()
-    },
-    { 
-      id: 3, 
-      type: 'AI',
-      title: "AI flagged a high-potential match", 
-      subtitle: "Candidate #4892 exceeds requirements",
-      createdAt: new Date(Date.now() - 4 * 3600000).toISOString()
-    },
-  ];
-
+  // --- ACTIVE DASHBOARD STATE ---
   return (
-    <div className="space-y-8 font-sans">
+    <div className="space-y-8 font-sans animate-fade-in-up">
       
       {/* 1. Welcome Header */}
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col md:flex-row md:items-end justify-between gap-6"
-      >
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h2 className={cn("text-3xl lg:text-4xl font-bold tracking-tight mb-2", theme === 'light' ? "text-black" : "text-white")}>
-            Good morning, {userName}
+            Good morning, {user.name.split(' ')[0]}
           </h2>
           <p className={cn("text-lg font-medium", theme === 'light' ? "text-black/60" : "text-white/60")}>
             Here is what's happening with your hiring pipeline.
           </p>
         </div>
-        <motion.button 
-          whileTap={{ scale: 0.95 }}
-          className="flex items-center gap-2 bg-[#6D28D9] text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-[#5b21b6] transition-colors"
-        >
-          <Plus size={20} />
-          Create New Job
-        </motion.button>
-      </motion.div>
+        {onNavigateCreateJob ? (
+          <motion.button 
+            onClick={onNavigateCreateJob}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 bg-[#6D28D9] text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-[#5b21b6] transition-colors"
+          >
+            <Plus size={20} />
+            Create New Job
+          </motion.button>
+        ) : (
+          <Link to="/dashboard/jobs/new">
+            <motion.button 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex items-center gap-2 bg-[#6D28D9] text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-[#5b21b6] transition-colors"
+            >
+              <Plus size={20} />
+              Create New Job
+            </motion.button>
+          </Link>
+        )}
+      </div>
 
       {/* 2. Vital Stats Grid */}
-      <StatsGrid stats={initialStats} />
+      <StatsGrid stats={stats} />
 
       {/* 3. Main Analytics & 4. Live Feed */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
@@ -139,7 +149,7 @@ export const DashboardClient = ({ initialStats, userName = "Alex" }: DashboardCl
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
+          transition={{ delay: 0.2 }}
           className="lg:col-span-2"
         >
           <VolumeChart />
@@ -149,10 +159,11 @@ export const DashboardClient = ({ initialStats, userName = "Alex" }: DashboardCl
         <motion.div 
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.6 }}
+          transition={{ delay: 0.3 }}
           className="lg:col-span-1 h-full"
         >
-           <ActivityFeed initialActivities={initialActivities} />
+           {/* Pass mapped activities from hook */}
+           <ActivityFeed initialActivities={mappedActivityFeed} />
         </motion.div>
 
       </div>

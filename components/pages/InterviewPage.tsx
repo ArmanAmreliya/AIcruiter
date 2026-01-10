@@ -30,9 +30,13 @@ export const InterviewPage = ({ jobId = "job_123", onEndInterview }: InterviewPa
           audio: true 
         });
         setStream(mediaStream);
+        setError(null);
       } catch (err) {
-        console.error("Error accessing media devices:", err);
-        setError("Permission denied");
+        console.warn("Error accessing media devices, falling back to simulation:", err);
+        // Fallback to simulated stream for demo
+        const fakeStream = createDummyStream();
+        setStream(fakeStream);
+        // Don't set error, allowing user to proceed in demo mode
       }
     };
 
@@ -44,6 +48,58 @@ export const InterviewPage = ({ jobId = "job_123", onEndInterview }: InterviewPa
       }
     };
   }, []);
+
+  // Helper to create a dummy stream for demo purposes
+  const createDummyStream = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = 480;
+    const ctx = canvas.getContext('2d');
+    
+    // Animation loop
+    const draw = () => {
+      if (!ctx) return;
+      ctx.fillStyle = '#18181b'; // zinc-900
+      ctx.fillRect(0, 0, 640, 480);
+      
+      const time = Date.now() / 2000;
+      const x = 320 + Math.sin(time) * 50;
+      const y = 240 + Math.cos(time * 1.5) * 30;
+
+      // Pulse effect
+      const gradient = ctx.createRadialGradient(x, y, 10, x, y, 120);
+      gradient.addColorStop(0, 'rgba(124, 58, 237, 0.4)'); // Purple
+      gradient.addColorStop(1, 'transparent');
+      
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(x, y, 120, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Text
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 24px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Demo Mode', 320, 230);
+      
+      ctx.fillStyle = '#a1a1aa'; // zinc-400
+      ctx.font = '16px Inter, sans-serif';
+      ctx.fillText('Camera Simulated', 320, 260);
+
+      requestAnimationFrame(draw);
+    };
+    draw();
+
+    // Create dummy audio track
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const dest = audioCtx.createMediaStreamDestination();
+    // Leave it silent
+
+    const videoTrack = canvas.captureStream(30).getVideoTracks()[0];
+    const audioTrack = dest.stream.getAudioTracks()[0];
+    
+    return new MediaStream([videoTrack, audioTrack]);
+  };
 
   // Simulate AI Speaking patterns when active
   useEffect(() => {
@@ -62,7 +118,11 @@ export const InterviewPage = ({ jobId = "job_123", onEndInterview }: InterviewPa
       stream.getAudioTracks().forEach(track => {
         track.enabled = !track.enabled;
       });
-      setIsMuted(!stream.getAudioTracks()[0].enabled);
+      // Toggle logic for the UI state
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+         setIsMuted(!audioTrack.enabled);
+      }
     }
   };
 
@@ -114,7 +174,7 @@ export const InterviewPage = ({ jobId = "job_123", onEndInterview }: InterviewPa
 
             <button 
               onClick={startInterview}
-              disabled={!!error || !stream}
+              disabled={!!error && !stream} // Only disable if error AND no stream (fallback stream allows progress)
               className="w-full sm:w-auto px-10 h-16 bg-black text-white rounded-full text-lg font-bold shadow-2xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-3"
             >
               Start Interview
