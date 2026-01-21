@@ -1,12 +1,17 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, PhoneOff, AlertCircle, Loader2, Sparkles } from 'lucide-react';
+import { Mic, PhoneOff, AlertCircle, Loader2, Sparkles, User, Settings2 } from 'lucide-react';
+import { LoadingLogo } from '../ui/LoadingLogo';
 import { cn } from '../../lib/utils';
+import { useTheme } from '../../context/ThemeContext';
 
 export const InterviewSimulationPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isPreview = searchParams.get('preview') === 'true';
+  const { theme } = useTheme(); // Respect global theme
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const selfViewRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -37,7 +42,7 @@ export const InterviewSimulationPage = () => {
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         setStream(mediaStream);
-        
+
         // Setup Video
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream;
@@ -116,14 +121,14 @@ export const InterviewSimulationPage = () => {
   const speakQuestion = () => {
     const question = QUESTIONS[currentQuestionIndex];
     const utterance = new SpeechSynthesisUtterance(question);
-    
+
     // Attempt to select a better voice
     const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(v => v.name.includes('Google US English')) || 
-                           voices.find(v => v.lang.includes('en-US')) || 
-                           voices[0];
+    const preferredVoice = voices.find(v => v.name.includes('Google US English')) ||
+      voices.find(v => v.lang.includes('en-US')) ||
+      voices[0];
     if (preferredVoice) utterance.voice = preferredVoice;
-    
+
     utterance.rate = 1;
     utterance.pitch = 1;
 
@@ -144,54 +149,82 @@ export const InterviewSimulationPage = () => {
 
   const handleEnd = () => {
     window.speechSynthesis.cancel();
-    navigate('/dashboard');
+    if (isPreview) {
+      // Close window or go back
+      window.close();
+      navigate('/dashboard/interviews');
+    } else {
+      navigate('/'); // Redirect candidates to Home or Thank You page
+    }
   };
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans overflow-hidden">
-      
+    <div className={cn(
+      "min-h-screen font-sans overflow-hidden selection:bg-purple-500/30",
+      theme === 'light' ? "bg-white text-black" : "bg-black text-white"
+    )}>
+
+      {/* PREVIEW BADGE */}
+      {isPreview && (
+        <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-2 pointer-events-none">
+          <div className="bg-orange-500 text-white px-4 py-1 rounded-full text-xs font-bold shadow-lg uppercase tracking-wider flex items-center gap-2 pointer-events-auto">
+            <User size={12} /> Recruiter Preview Mode
+          </div>
+        </div>
+      )}
+
       {/* --- STAGE 1: LOBBY --- */}
       {stage === 'LOBBY' && (
         <div className="h-screen flex flex-col items-center justify-center p-6 relative">
           {/* Background Grid */}
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
-          <div className="absolute inset-0 bg-black/80 pointer-events-none" />
+          <div className={cn(
+            "absolute inset-0 bg-[size:40px_40px] pointer-events-none opacity-20",
+            theme === 'light'
+              ? "bg-[linear-gradient(rgba(0,0,0,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.05)_1px,transparent_1px)]"
+              : "bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)]"
+          )} />
 
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl relative z-10"
+            className={cn(
+              "w-full max-w-2xl rounded-[2rem] p-8 shadow-2xl relative z-10 border transition-colors",
+              theme === 'light' ? "bg-white border-gray-100" : "bg-zinc-900 border-zinc-800"
+            )}
           >
             <div className="text-center mb-8">
-               <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white text-black mb-4">
-                  <Sparkles size={24} />
-               </div>
-               <h1 className="text-3xl font-bold">System Check</h1>
-               <p className="text-zinc-400 mt-2">Ensure your camera and microphone are working.</p>
+              <div className={cn(
+                "inline-flex items-center justify-center w-12 h-12 rounded-2xl mb-4 shadow-sm",
+                theme === 'light' ? "bg-purple-100 text-purple-600" : "bg-white/10 text-white"
+              )}>
+                <Sparkles size={24} />
+              </div>
+              <h1 className={cn("text-3xl font-bold", theme === 'light' ? "text-black" : "text-white")}>System Check</h1>
+              <p className={cn("mt-2", theme === 'light' ? "text-gray-500" : "text-zinc-400")}>Ensure your camera and microphone are working.</p>
             </div>
-            
+
             {/* Video Preview */}
-            <div className="relative aspect-video bg-black rounded-2xl overflow-hidden mb-8 border border-zinc-800 shadow-inner">
+            <div className="relative aspect-video bg-black rounded-2xl overflow-hidden mb-8 border shadow-inner">
               {error ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-red-500 bg-zinc-900">
                   <AlertCircle size={48} className="mb-4" />
                   <p className="font-medium">{error}</p>
                 </div>
               ) : (
-                <video 
-                  ref={videoRef} 
-                  autoPlay 
-                  playsInline 
-                  muted 
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
                   className="w-full h-full object-cover transform scale-x-[-1]"
                 />
               )}
-              
+
               {/* Mic Meter Overlay */}
               <div className="absolute bottom-4 left-4 right-4 flex items-center gap-3 bg-black/60 backdrop-blur-md px-4 py-3 rounded-xl border border-white/10">
                 <Mic size={20} className={cn("transition-colors", micLevel > 5 ? "text-green-400" : "text-white/50")} />
                 <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                  <motion.div 
+                  <motion.div
                     className="h-full bg-green-500"
                     animate={{ width: `${micLevel}%` }}
                     transition={{ type: "tween", ease: "linear", duration: 0.05 }}
@@ -200,11 +233,17 @@ export const InterviewSimulationPage = () => {
               </div>
             </div>
 
-            <div className="flex justify-center">
+            <div className="flex justify-center gap-4">
+              <button className={cn(
+                "px-6 py-4 rounded-full font-bold text-lg flex items-center gap-2 transition-colors",
+                theme === 'light' ? "bg-gray-100 hover:bg-gray-200 text-black" : "bg-white/5 hover:bg-white/10 text-white"
+              )}>
+                <Settings2 size={20} />
+              </button>
               <button
                 onClick={handleJoin}
                 disabled={!!error || !stream}
-                className="px-10 py-4 bg-white text-black rounded-full font-bold text-lg hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)]"
+                className="flex-1 px-10 py-4 bg-[#6D28D9] text-white rounded-full font-bold text-lg hover:bg-[#5b21b6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20"
               >
                 Join Interview
               </button>
@@ -215,20 +254,23 @@ export const InterviewSimulationPage = () => {
 
       {/* --- STAGE 2: INTERVIEW ROOM --- */}
       {stage === 'ROOM' && (
-        <div className="h-screen flex flex-col relative bg-black">
-          
+        <div className={cn(
+          "h-screen flex flex-col relative",
+          theme === 'light' ? "bg-gray-50" : "bg-black"
+        )}>
+
           {/* Header */}
           <header className="absolute top-0 w-full p-6 flex justify-between items-center z-20">
-            <div className="flex items-center gap-3 bg-zinc-900/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
+            <div className="flex items-center gap-3 bg-black/80 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-sm">
               <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
-              <span className="text-xs font-mono font-bold text-white/80 tracking-widest">REC</span>
+              <span className="text-xs font-mono font-bold text-white/90 tracking-widest">RECORDING</span>
             </div>
-            <button 
+            <button
               onClick={handleEnd}
               className="bg-red-500/10 hover:bg-red-500/20 text-red-500 px-6 py-2.5 rounded-full text-sm font-bold border border-red-500/20 transition-colors flex items-center gap-2"
             >
               <PhoneOff size={16} />
-              End Interview
+              End Session
             </button>
           </header>
 
@@ -239,12 +281,12 @@ export const InterviewSimulationPage = () => {
               {/* Ripple Effect (Speaking) */}
               {aiState === 'SPEAKING' && (
                 <>
-                  <motion.div 
+                  <motion.div
                     animate={{ scale: [1, 1.8], opacity: [0.4, 0] }}
                     transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
                     className="absolute inset-0 rounded-full border border-purple-500/40"
                   />
-                   <motion.div 
+                  <motion.div
                     animate={{ scale: [1, 1.4], opacity: [0.6, 0] }}
                     transition={{ duration: 2, repeat: Infinity, ease: "easeOut", delay: 0.5 }}
                     className="absolute inset-0 rounded-full border border-purple-500/40"
@@ -254,34 +296,39 @@ export const InterviewSimulationPage = () => {
 
               {/* Orbit Rings (Thinking) */}
               {aiState === 'THINKING' && (
-                 <motion.div 
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-[-20px] rounded-full border border-t-white/50 border-r-transparent border-b-transparent border-l-transparent"
-                 />
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  className={cn(
+                    "absolute inset-[-20px] rounded-full border border-t-purple-500/50 border-r-transparent border-b-transparent border-l-transparent",
+                    theme === 'light' ? "border-t-purple-600" : "border-t-white/50"
+                  )}
+                />
               )}
-              
+
               {/* Core Circle */}
               <motion.div
-                animate={{ 
+                animate={{
                   scale: aiState === 'SPEAKING' ? [1, 1.05, 1] : 1,
-                  boxShadow: aiState === 'SPEAKING' 
-                    ? "0 0 60px 10px rgba(168,85,247,0.5)" 
-                    : aiState === 'THINKING' 
-                      ? "0 0 30px 5px rgba(255,255,255,0.3)" 
+                  boxShadow: aiState === 'SPEAKING'
+                    ? "0 0 60px 10px rgba(168,85,247,0.5)"
+                    : aiState === 'THINKING'
+                      ? "0 0 30px 5px rgba(168,85,247,0.2)"
                       : "0 0 0px 0px rgba(0,0,0,0)",
-                  backgroundColor: aiState === 'THINKING' ? '#ffffff' : '#000000',
                 }}
                 transition={{ duration: 0.5 }}
                 className={cn(
-                  "w-40 h-40 rounded-full flex items-center justify-center z-10 border-4 transition-colors duration-500",
-                  aiState === 'THINKING' ? "border-white" : "border-purple-600 bg-black"
+                  "w-40 h-40 rounded-full flex items-center justify-center z-10 border transition-colors duration-500 shadow-2xl overflow-hidden",
+                  theme === 'light'
+                    ? "bg-white border-purple-100"
+                    : "bg-black border-purple-600/50"
                 )}
               >
-                 {aiState === 'THINKING' && <Loader2 className="text-black animate-spin" size={40} />}
-                 {aiState !== 'THINKING' && (
-                   <div className="w-full h-full rounded-full bg-gradient-to-tr from-purple-900/50 to-transparent opacity-50" />
-                 )}
+                {aiState === 'THINKING' ? (
+                  <LoadingLogo size={80} />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 opacity-90" />
+                )}
               </motion.div>
             </div>
 
@@ -297,7 +344,9 @@ export const InterviewSimulationPage = () => {
                 >
                   <p className={cn(
                     "text-2xl font-light tracking-tight",
-                    aiState === 'SPEAKING' ? "text-purple-400" : "text-white/80"
+                    aiState === 'SPEAKING'
+                      ? "text-purple-500 font-medium"
+                      : (theme === 'light' ? "text-gray-500" : "text-white/80")
                   )}>
                     {aiState === 'LISTENING' && "I'm listening..."}
                     {aiState === 'THINKING' && "Thinking..."}
@@ -305,14 +354,14 @@ export const InterviewSimulationPage = () => {
                   </p>
                   {aiState === 'LISTENING' && (
                     <div className="flex gap-1 mt-2">
-                       {[1,2,3].map(i => (
-                         <motion.div 
-                           key={i}
-                           animate={{ height: [4, 12, 4] }}
-                           transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                           className="w-1 bg-white/50 rounded-full"
-                         />
-                       ))}
+                      {[1, 2, 3].map(i => (
+                        <motion.div
+                          key={i}
+                          animate={{ height: [4, 12, 4] }}
+                          transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                          className={cn("w-1 rounded-full", theme === 'light' ? "bg-black/20" : "bg-white/50")}
+                        />
+                      ))}
                     </div>
                   )}
                 </motion.div>
@@ -321,20 +370,23 @@ export const InterviewSimulationPage = () => {
           </main>
 
           {/* Self View (Bottom Right) */}
-          <motion.div 
-             initial={{ y: 100, opacity: 0 }}
-             animate={{ y: 0, opacity: 1 }}
-             transition={{ delay: 0.5 }}
-             className="absolute bottom-8 right-8 w-64 aspect-[4/3] bg-zinc-900 rounded-2xl overflow-hidden border border-white/20 shadow-2xl"
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="absolute bottom-8 right-8 w-64 aspect-[4/3] bg-black rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl"
           >
-            <video 
-              ref={selfViewRef} 
-              autoPlay 
-              playsInline 
-              muted 
+            <video
+              ref={selfViewRef}
+              autoPlay
+              playsInline
+              muted
               className="w-full h-full object-cover transform scale-x-[-1]"
             />
             <div className="absolute top-3 right-3 w-2.5 h-2.5 bg-green-500 rounded-full border border-black shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
+            <div className="absolute bottom-3 left-3 text-[10px] font-bold text-white/80 bg-black/50 px-2 py-0.5 rounded-full backdrop-blur-sm">
+              YOU
+            </div>
           </motion.div>
         </div>
       )}

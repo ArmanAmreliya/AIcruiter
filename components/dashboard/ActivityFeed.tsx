@@ -38,10 +38,10 @@ export const ActivityFeed = ({ initialActivities }: ActivityFeedProps) => {
         },
         (payload) => {
           const newActivity = payload.new as ActivityItem;
-          
+
           // Add to state and maintain max 5 items
           setActivities((prev) => [newActivity, ...prev].slice(0, 5));
-          
+
           // Trigger toast
           toast.message("New Activity", {
             description: newActivity.title,
@@ -63,7 +63,7 @@ export const ActivityFeed = ({ initialActivities }: ActivityFeedProps) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
+
     if (diffInSeconds < 60) return 'Just now';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
@@ -92,25 +92,25 @@ export const ActivityFeed = ({ initialActivities }: ActivityFeedProps) => {
               className="relative z-10"
             >
               <div className="relative">
-                 {/* Connector Line (only if not last) */}
-                 {index !== activities.length - 1 && (
-                   <div className={cn(
-                     "absolute left-5 top-12 bottom-[-24px] w-px",
-                     theme === 'light' ? "bg-black/5" : "bg-white/10"
-                   )} />
-                 )}
+                {/* Connector Line (only if not last) */}
+                {index !== activities.length - 1 && (
+                  <div className={cn(
+                    "absolute left-5 top-12 bottom-[-24px] w-px",
+                    theme === 'light' ? "bg-black/5" : "bg-white/10"
+                  )} />
+                )}
 
                 <div className="flex gap-4 items-start">
                   {/* Avatar */}
                   <div className="shrink-0 relative">
                     {item.avatarUrl ? (
-                      <img 
-                        src={item.avatarUrl} 
-                        alt="Avatar" 
+                      <img
+                        src={item.avatarUrl}
+                        alt="Avatar"
                         className={cn(
                           "w-10 h-10 rounded-full object-cover border-2",
                           theme === 'light' ? "border-white" : "border-black"
-                        )} 
+                        )}
                       />
                     ) : (
                       <div className="w-10 h-10 rounded-full bg-[#6D28D9] flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
@@ -122,26 +122,26 @@ export const ActivityFeed = ({ initialActivities }: ActivityFeedProps) => {
                   {/* Content */}
                   <div className="flex-1 min-w-0 pt-0.5">
                     <div className="flex justify-between items-start gap-2">
-                       <p className={cn("text-sm font-bold mb-1 leading-snug", theme === 'light' ? "text-black" : "text-white")}>
-                         {item.title}
-                       </p>
-                       <span className={cn("text-[10px] whitespace-nowrap", theme === 'light' ? "text-black/40" : "text-white/40")}>
-                         {formatTime(item.createdAt)}
-                       </span>
+                      <p className={cn("text-sm font-bold mb-1 leading-snug", theme === 'light' ? "text-black" : "text-white")}>
+                        {item.title}
+                      </p>
+                      <span className={cn("text-[10px] whitespace-nowrap", theme === 'light' ? "text-black/40" : "text-white/40")}>
+                        {formatTime(item.createdAt)}
+                      </span>
                     </div>
 
                     {/* Match Badge */}
                     {item.type === 'INTERVIEW' && item.score && (
                       <div className="mb-2">
-                         <span className={cn(
-                           "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
-                           theme === 'light' 
-                             ? "bg-black text-white border-[#6D28D9]" 
-                             : "bg-white text-black border-[#6D28D9]"
-                         )}>
-                           <span className="w-1.5 h-1.5 rounded-full bg-[#6D28D9] mr-1.5 animate-pulse"></span>
-                           {item.score}% Match
-                         </span>
+                        <span className={cn(
+                          "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                          theme === 'light'
+                            ? "bg-black text-white border-[#6D28D9]"
+                            : "bg-white text-black border-[#6D28D9]"
+                        )}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#6D28D9] mr-1.5 animate-pulse"></span>
+                          {item.score}% Match
+                        </span>
                       </div>
                     )}
 
@@ -156,7 +156,7 @@ export const ActivityFeed = ({ initialActivities }: ActivityFeedProps) => {
             </motion.div>
           ))}
         </AnimatePresence>
-        
+
         {activities.length === 0 && (
           <div className="text-center py-10 opacity-50 text-sm">
             No recent activity
@@ -164,12 +164,14 @@ export const ActivityFeed = ({ initialActivities }: ActivityFeedProps) => {
         )}
       </div>
 
-      <button className={cn(
-        "w-full mt-auto pt-6 py-3 rounded-xl text-sm font-bold transition-colors border border-dashed",
-        theme === 'light' 
-          ? "border-black/20 text-black/60 hover:bg-black/5 hover:text-black" 
-          : "border-white/20 text-white/60 hover:bg-white/5 hover:text-white"
-      )}>
+      <button
+        onClick={() => { window.location.href = '/dashboard/candidates'; }} // Changed to candidates as activity page doesn't exist yet in the router I saw
+        className={cn(
+          "w-full mt-auto pt-6 py-3 rounded-xl text-sm font-bold transition-colors border border-dashed",
+          theme === 'light'
+            ? "border-black/20 text-black/60 hover:bg-black/5 hover:text-black"
+            : "border-white/20 text-white/60 hover:bg-white/5 hover:text-white"
+        )}>
         View All Activity
       </button>
     </div>

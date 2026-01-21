@@ -5,6 +5,7 @@ import { Moon, Sun, Menu, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
 import { Button } from '../ui/Button';
+import { LoadingLogo } from '../ui/LoadingLogo';
 
 interface NavbarProps {
   onNavigateLogin: () => void;
@@ -38,7 +39,7 @@ export const Navbar = ({ onNavigateLogin, onNavigateSignup }: NavbarProps) => {
   };
 
   return (
-    <motion.nav 
+    <motion.nav
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       className={cn(
@@ -52,14 +53,14 @@ export const Navbar = ({ onNavigateLogin, onNavigateSignup }: NavbarProps) => {
       )}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-             <img width="48" height="48" src="https://img.icons8.com/forma-thin/96/7950F2/bot.png" alt="AIcruiter Bot Logo" className="w-8 h-8 md:w-10 md:h-10"/>
-            <span className="text-xl font-bold tracking-tight">AIcruiter</span>
+            <img width="64" height="64" src="https://img.icons8.com/forma-thin/96/7950F2/bot.png" alt="AIcruiter Bot Logo" className="w-12 h-12" />
+            <span className="text-xl font-bold tracking-tight text-black dark:text-white">AIcruiter</span>
           </div>
 
           <div className="hidden md:flex items-center gap-8">
             {navItems.map((item) => (
-              <button 
-                key={item.name} 
+              <button
+                key={item.name}
                 onClick={() => scrollToSection(item.id)}
                 className="text-sm font-medium hover:text-purple-600 dark:hover:text-purple-400 transition-colors bg-transparent border-none cursor-pointer"
               >
@@ -69,8 +70,8 @@ export const Navbar = ({ onNavigateLogin, onNavigateSignup }: NavbarProps) => {
           </div>
 
           <div className="hidden md:flex items-center gap-4">
-            <button 
-              onClick={toggleTheme} 
+            <button
+              onClick={toggleTheme}
               className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
             >
               {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
@@ -83,7 +84,7 @@ export const Navbar = ({ onNavigateLogin, onNavigateSignup }: NavbarProps) => {
             </Button>
           </div>
 
-          <button 
+          <button
             className="md:hidden p-2"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
@@ -103,8 +104,8 @@ export const Navbar = ({ onNavigateLogin, onNavigateSignup }: NavbarProps) => {
           >
             <div className="flex flex-col gap-4">
               {navItems.map((item) => (
-                <button 
-                  key={item.name} 
+                <button
+                  key={item.name}
                   onClick={() => scrollToSection(item.id)}
                   className="p-2 font-medium hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-left"
                 >
