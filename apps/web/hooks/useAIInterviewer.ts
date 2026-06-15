@@ -3,9 +3,16 @@ import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import Groq from 'groq-sdk';
 import { supabase } from '../lib/supabase';
 
-// --- Constants ---
-const DEEPGRAM_API_KEY = import.meta.env.VITE_DEEPGRAM_API_KEY;
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+// --- Safe Environment Fetch Helper ---
+const getEnv = (key: string): string | undefined => {
+    if (typeof process !== 'undefined' && process.env) {
+        return process.env[key];
+    }
+    return (import.meta as any).env?.[key];
+};
+
+const DEEPGRAM_API_KEY = getEnv('VITE_DEEPGRAM_API_KEY');
+const GROQ_API_KEY = getEnv('VITE_GROQ_API_KEY');
 
 type InterviewStatus = 'IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING';
 

@@ -4,6 +4,7 @@ import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 interface LoadingLogoProps {
     className?: string;
     size?: number;
+    loading?: boolean;
 }
 
 export const LoadingLogo: React.FC<LoadingLogoProps> = ({

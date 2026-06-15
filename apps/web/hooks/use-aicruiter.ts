@@ -155,8 +155,8 @@ export const useAiCruiter = () => {
   const createJob = async (
     title: string,
     description: string,
-    duration: number,
-    interviewTypes: string[]
+    duration: number = 15,
+    interviewTypes: string[] = ["Technical"]
   ) => {
     setLoading(true);
     try {

@@ -18,7 +18,7 @@ const ErrorFallback = ({ error, resetErrorBoundary }: FallbackProps) => {
                     We encountered an unexpected error. Our team has been notified.
                 </p>
                 <div className="bg-neutral-100 dark:bg-neutral-800 p-3 rounded-lg text-left overflow-auto max-h-32 text-xs font-mono text-neutral-500">
-                    {error.message}
+                    {(error as any)?.message || String(error)}
                 </div>
                 <div className="pt-4 space-x-4">
                     <button

@@ -25,3 +25,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Next.js and Turbo
+.next/
+.turbo/
+.vercel/
+out/
+build/

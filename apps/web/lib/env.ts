@@ -8,8 +8,15 @@ const envSchema = z.object({
     GEMINI_API_KEY: z.string().optional(),
 });
 
-// Use import.meta.env directly for validation
-const parsed = envSchema.safeParse(import.meta.env);
+const getEnvObj = () => {
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env;
+  }
+  return (import.meta as any).env || {};
+};
+
+// Use safe environment object for validation
+const parsed = envSchema.safeParse(getEnvObj());
 
 if (!parsed.success) {
     console.error(

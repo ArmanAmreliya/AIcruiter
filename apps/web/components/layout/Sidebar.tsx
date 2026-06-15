@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { LayoutGrid, Video, Users, Settings, LogOut, FileText } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
@@ -9,7 +9,6 @@ import { Link } from 'react-router-dom';
 export const Sidebar = () => {
   const { theme } = useTheme();
   const { user } = useAiCruiter();
-  const location = useLocation();
 
   const links = [
     { name: 'Overview', href: '/dashboard', icon: LayoutGrid },

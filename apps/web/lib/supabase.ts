@@ -14,9 +14,9 @@ const getEnv = (key: string): string | undefined => {
   return typeof value === 'string' ? value : undefined;
 };
 
-// 1. Force the use of Vite environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// 1. Use safe helper to retrieve environment variables
+const supabaseUrl = getEnv('VITE_SUPABASE_URL');
+const supabaseKey = getEnv('VITE_SUPABASE_ANON_KEY');
 
 // 2. FAIL FAST: If keys are missing, throw an error immediately.
 // This prevents the "infinite loading" bug by ensuring we never use a fake client.
