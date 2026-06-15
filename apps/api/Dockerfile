@@ -1,0 +1,36 @@
+# Stage 1: Build the TypeScript code
+FROM node:20-alpine AS builder
+WORKDIR /app
+RUN npm install -g pnpm
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/db/package.json ./packages/db/
+COPY packages/types/package.json ./packages/types/
+RUN pnpm install --ignore-scripts
+COPY . .
+RUN pnpm --filter @aicruiter/db build
+RUN pnpm --filter @aicruiter/types build
+RUN pnpm --filter @aicruiter/api build
+
+# Stage 2: Production runtime image
+FROM node:20-alpine AS runner
+WORKDIR /app
+RUN npm install -g pnpm
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/db/package.json ./packages/db/
+COPY packages/types/package.json ./packages/types/
+RUN pnpm install --prod --ignore-scripts
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/packages/db/dist ./packages/db/dist
+COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
+COPY --from=builder /app/packages/types/dist ./packages/types/dist
+
+# AWS Lambda Web Adapter binary to run standard web server in Lambda
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.8.4 /lambda-adapter /opt/extensions/lambda-adapter
+
+ENV PORT=4000
+ENV NODE_ENV=production
+EXPOSE 4000
+
+CMD ["node", "apps/api/dist/server.js"]

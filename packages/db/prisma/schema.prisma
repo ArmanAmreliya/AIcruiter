@@ -1,0 +1,71 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  fullName    String?
+  role        String?
+  companyName String?
+  website     String?
+  aiCredits   Int      @default(100)
+  onboarded   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  jobs        Job[]
+}
+
+model Job {
+  id               String                @id @default(uuid())
+  userId           String
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title            String
+  jobRole          String?
+  durationMinutes  Int                   @default(15)
+  interviewType    String[]              @default(["Technical"])
+  experienceLevel  String                @default("Mid-Level")
+  status           String                @default("DRAFT")
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  candidates       Candidate[]
+  transcripts      InterviewTranscript[]
+}
+
+model Candidate {
+  id          String                @id @default(uuid())
+  jobId       String
+  job         Job                   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  name        String
+  email       String
+  status      String                @default("STARTED")
+  resumeUrl   String?
+  metaData    Json                  @default("{}")
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  transcripts InterviewTranscript[]
+}
+
+model InterviewTranscript {
+  id          String    @id @default(uuid())
+  jobId       String
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  userText    String
+  aiText      String
+  createdAt   DateTime  @default(now())
+}
+
+model Activity {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+}

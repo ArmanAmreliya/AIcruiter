@@ -1,0 +1,130 @@
+{
+  "hash": "c0b121f5",
+  "configHash": "713fabe8",
+  "lockfileHash": "e3b0c442",
+  "browserHash": "57945cb6",
+  "optimized": {
+    "@deepgram/sdk": {
+      "src": "../../node_modules/@deepgram/sdk/dist/module/index.js",
+      "file": "@deepgram_sdk.js",
+      "fileHash": "277ff158",
+      "needsInterop": false
+    },
+    "@hookform/resolvers/zod": {
+      "src": "../../node_modules/@hookform/resolvers/zod/dist/zod.mjs",
+      "file": "@hookform_resolvers_zod.js",
+      "fileHash": "a318d4ce",
+      "needsInterop": false
+    },
+    "@lottiefiles/dotlottie-react": {
+      "src": "../../node_modules/@lottiefiles/dotlottie-react/dist/browser/index.js",
+      "file": "@lottiefiles_dotlottie-react.js",
+      "fileHash": "ec39dcb7",
+      "needsInterop": false
+    },
+    "@supabase/supabase-js": {
+      "src": "../../node_modules/@supabase/supabase-js/dist/module/index.js",
+      "file": "@supabase_supabase-js.js",
+      "fileHash": "ff606a3b",
+      "needsInterop": false
+    },
+    "framer-motion": {
+      "src": "../../node_modules/framer-motion/dist/es/index.mjs",
+      "file": "framer-motion.js",
+      "fileHash": "de07494d",
+      "needsInterop": false
+    },
+    "groq-sdk": {
+      "src": "../../node_modules/groq-sdk/index.mjs",
+      "file": "groq-sdk.js",
+      "fileHash": "b81074ed",
+      "needsInterop": false
+    },
+    "lucide-react": {
+      "src": "../../node_modules/lucide-react/dist/esm/lucide-react.js",
+      "file": "lucide-react.js",
+      "fileHash": "edda11a7",
+      "needsInterop": false
+    },
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "d2ffe226",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "2221bedd",
+      "needsInterop": true
+    },
+    "react-error-boundary": {
+      "src": "../../node_modules/react-error-boundary/dist/react-error-boundary.js",
+      "file": "react-error-boundary.js",
+      "fileHash": "4d58a2f7",
+      "needsInterop": false
+    },
+    "react-hook-form": {
+      "src": "../../node_modules/react-hook-form/dist/index.esm.mjs",
+      "file": "react-hook-form.js",
+      "fileHash": "2b62418c",
+      "needsInterop": false
+    },
+    "react-router-dom": {
+      "src": "../../node_modules/react-router-dom/dist/index.js",
+      "file": "react-router-dom.js",
+      "fileHash": "706e43dc",
+      "needsInterop": false
+    },
+    "recharts": {
+      "src": "../../node_modules/recharts/es6/index.js",
+      "file": "recharts.js",
+      "fileHash": "234eb9ac",
+      "needsInterop": false
+    },
+    "sonner": {
+      "src": "../../node_modules/sonner/dist/index.mjs",
+      "file": "sonner.js",
+      "fileHash": "5c022b10",
+      "needsInterop": false
+    },
+    "zod": {
+      "src": "../../node_modules/zod/index.js",
+      "file": "zod.js",
+      "fileHash": "8b8bf17f",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "browser-B5UES2FC": {
+      "file": "browser-B5UES2FC.js"
+    },
+    "browser-ponyfill-RBBONYKE": {
+      "file": "browser-ponyfill-RBBONYKE.js"
+    },
+    "browser-NHTZYOGV": {
+      "file": "browser-NHTZYOGV.js"
+    },
+    "chunk-XCDHS5NV": {
+      "file": "chunk-XCDHS5NV.js"
+    },
+    "chunk-YHGTQG2Z": {
+      "file": "chunk-YHGTQG2Z.js"
+    },
+    "chunk-3KCUMLL7": {
+      "file": "chunk-3KCUMLL7.js"
+    },
+    "chunk-4SLNLKD7": {
+      "file": "chunk-4SLNLKD7.js"
+    },
+    "chunk-2TQQL6L7": {
+      "file": "chunk-2TQQL6L7.js"
+    },
+    "chunk-2PIBWAMS": {
+      "file": "chunk-2PIBWAMS.js"
+    },
+    "chunk-V4OQ3NZ2": {
+      "file": "chunk-V4OQ3NZ2.js"
+    }
+  }
+}
