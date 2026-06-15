@@ -14,23 +14,11 @@ const getEnv = (key: string): string | undefined => {
   return typeof value === 'string' ? value : undefined;
 };
 
-// 1. Use safe helper to retrieve environment variables
-const supabaseUrl = getEnv('VITE_SUPABASE_URL');
-const supabaseKey = getEnv('VITE_SUPABASE_ANON_KEY');
+// 1. Use safe helper to retrieve environment variables (checking both NEXT_ and VITE_ prefixes)
+const supabaseUrl = getEnv('NEXT_SUPABASE_URL') || getEnv('VITE_SUPABASE_URL');
+const supabaseKey = getEnv('NEXT_SUPABASE_ANON_KEY') || getEnv('VITE_SUPABASE_ANON_KEY');
 
-// 2. FAIL FAST: If keys are missing, throw an error immediately.
-// This prevents the "infinite loading" bug by ensuring we never use a fake client.
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error(
-    "🔴 MISSING SUPABASE KEYS: Check your .env file.\n" +
-    "Make sure you have VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY set."
-  );
-}
-
-// 3. Create the real client
-export const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Mock client to prevent "Failed to fetch" errors when env vars are missing or invalid
+// Mock client to prevent errors when env vars are missing or invalid
 const createMockClient = () => {
   const mockChannel = {
     on: () => mockChannel,
@@ -68,15 +56,17 @@ const createMockClient = () => {
 
 // Check if configured with valid HTTP URL
 const isConfigured =
-  supabaseUrl &&
+  !!(supabaseUrl &&
   supabaseKey &&
   supabaseUrl.startsWith('http') &&
-  !supabaseUrl.includes('placeholder');
+  !supabaseUrl.includes('placeholder'));
 
-// export const supabase = isConfigured
-//   ? createClient(supabaseUrl as string, supabaseKey as string)
-//   : createMockClient();
+// 3. Create the real client or fallback to the mock client
+export const supabase = isConfigured
+  ? createClient(supabaseUrl as string, supabaseKey as string)
+  : createMockClient();
 
 if (!isConfigured) {
-  console.log('Supabase credentials missing or invalid. Using mock client for demo mode.');
+  console.log('Supabase credentials missing or invalid. Using mock client for demo mode / build mode.');
 }
+

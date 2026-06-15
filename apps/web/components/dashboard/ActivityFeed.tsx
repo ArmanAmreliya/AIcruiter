@@ -36,7 +36,7 @@ export const ActivityFeed = ({ initialActivities }: ActivityFeedProps) => {
           schema: 'public',
           table: 'Activity',
         },
-        (payload) => {
+        (payload: any) => {
           const newActivity = payload.new as ActivityItem;
 
           // Add to state and maintain max 5 items

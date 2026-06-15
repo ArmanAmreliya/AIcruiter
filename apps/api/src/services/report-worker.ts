@@ -1,7 +1,14 @@
 import { prisma } from '@aicruiter/db';
 import Groq from 'groq-sdk';
 
-const groq = new Groq({ apiKey: process.env.VITE_GROQ_API_KEY });
+let groq: Groq | null = null;
+function getGroqClient() {
+  if (!groq) {
+    const apiKey = process.env.NEXT_GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY;
+    groq = new Groq({ apiKey });
+  }
+  return groq;
+}
 
 export async function generateCandidateReport(candidateId: string) {
   try {
@@ -62,7 +69,7 @@ Provide a JSON object containing:
 2. "feedback" (string containing 2-3 sentences of constructive evaluation).
 Return ONLY the JSON. No conversational wrappers.`;
 
-    const response = await groq.chat.completions.create({
+    const response = await getGroqClient().chat.completions.create({
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Here is the interview transcript for candidate ${candidate.name}:\n\n${dialog}` }

@@ -16,8 +16,15 @@ export function useNavigate() {
 }
 
 export function useParams<T extends Record<string, string | string[]> = Record<string, string | string[]>>(): Partial<T> {
-  const params = useNextParams();
-  return (params || {}) as unknown as Partial<T>;
+  const params = useNextParams() || {};
+  const result = { ...params } as any;
+  if (result.uniqueId && !result.jobId) {
+    result.jobId = result.uniqueId;
+  }
+  if (result.jobId && !result.uniqueId) {
+    result.uniqueId = result.jobId;
+  }
+  return result as unknown as Partial<T>;
 }
 
 export function useLocation() {

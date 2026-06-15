@@ -13,7 +13,7 @@ const getEnv = (key: string): string | undefined => {
     return (import.meta as any).env?.[key];
 };
 
-const GROQ_API_KEY = getEnv('VITE_GROQ_API_KEY');
+const GROQ_API_KEY = getEnv('NEXT_GROQ_API_KEY') || getEnv('VITE_GROQ_API_KEY');
 
 type InterviewStatus = 'IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING';
 

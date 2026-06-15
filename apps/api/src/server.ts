@@ -299,7 +299,7 @@ const resolvers = {
       return candidate;
     },
     getDeepgramToken: async () => {
-      const apiKey = process.env.VITE_DEEPGRAM_API_KEY;
+      const apiKey = process.env.NEXT_DEEPGRAM_API_KEY || process.env.VITE_DEEPGRAM_API_KEY;
       if (!apiKey) throw new Error("Deepgram API key not configured on backend");
 
       try {
