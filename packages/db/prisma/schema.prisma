@@ -1,6 +1,7 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {
@@ -27,6 +28,7 @@ model Job {
   user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   title            String
   jobRole          String?
+  description      String                @default("")
   durationMinutes  Int                   @default(15)
   interviewType    String[]              @default(["Technical"])
   experienceLevel  String                @default("Mid-Level")
