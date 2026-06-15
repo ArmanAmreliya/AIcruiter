@@ -120,3 +120,9 @@ export const UPDATE_CANDIDATE_INTERVIEW_STATUS = gql`
     }
   }
 `;
+
+export const GET_DEEPGRAM_TOKEN = gql`
+  mutation GetDeepgramToken {
+    getDeepgramToken
+  }
+`;

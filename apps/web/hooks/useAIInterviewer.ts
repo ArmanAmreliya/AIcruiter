@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
+import { useState, useEffect, useRef } from 'react';
 import Groq from 'groq-sdk';
 import { supabase } from '../lib/supabase';
+import { apolloClient } from '../lib/apollo-client';
+import { GET_DEEPGRAM_TOKEN } from '../lib/graphql-queries';
+import { toast } from 'sonner';
 
 // --- Safe Environment Fetch Helper ---
 const getEnv = (key: string): string | undefined => {
@@ -11,7 +13,6 @@ const getEnv = (key: string): string | undefined => {
     return (import.meta as any).env?.[key];
 };
 
-const DEEPGRAM_API_KEY = getEnv('VITE_DEEPGRAM_API_KEY');
 const GROQ_API_KEY = getEnv('VITE_GROQ_API_KEY');
 
 type InterviewStatus = 'IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING';
@@ -25,7 +26,7 @@ export const useAIInterviewer = (jobId: string, candidateId: string, candidateNa
     // Refs for persistent objects
     const audioContextRef = useRef<AudioContext | null>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const deepgramLiveRef = useRef<any>(null);
+    const deepgramLiveRef = useRef<WebSocket | null>(null);
     const groqRef = useRef<Groq | null>(null);
     const audioQueueRef = useRef<ArrayBuffer[]>([]);
     const isSpeakingRef = useRef(false);
@@ -49,7 +50,6 @@ export const useAIInterviewer = (jobId: string, candidateId: string, candidateNa
             source.connect(audioContextRef.current.destination);
 
             source.onended = () => {
-                // Handle next chunk or finish
                 if (audioQueueRef.current.length === 0) {
                     isSpeakingRef.current = false;
                     setStatus('LISTENING');
@@ -99,21 +99,28 @@ export const useAIInterviewer = (jobId: string, candidateId: string, candidateNa
             speak(responseText);
         } catch (error) {
             console.error("Groq Error:", error);
-            setStatus('IDLE');
+            setStatus('LISTENING');
         }
     };
 
-    // --- 3. Voice: Deepgram Aura TTS ---
+    // --- 3. Voice: Deepgram Aura TTS with Secure Temporary Token ---
     const speak = async (text: string) => {
         setStatus('SPEAKING');
         isSpeakingRef.current = true;
 
         try {
-            // Deepgram Aura REST API for simplicity in this version, can be optimized with WS
+            // A. Get a fresh short-lived token from backend to prevent key leakage
+            const { data } = await apolloClient.mutate<any>({
+                mutation: GET_DEEPGRAM_TOKEN
+            });
+            const token = data?.getDeepgramToken;
+            if (!token) throw new Error("Could not retrieve temporary Deepgram token");
+
+            // B. Request speech audio from Deepgram using temp token
             const response = await fetch(`https://api.deepgram.com/v1/speak?model=aura-asteria-en`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Token ${DEEPGRAM_API_KEY}`,
+                    'Authorization': `Token ${token}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ text })
@@ -144,79 +151,98 @@ export const useAIInterviewer = (jobId: string, candidateId: string, candidateNa
         }
     };
 
-    // --- 4. Ears: Deepgram Nova-2 STT ---
+    // --- 4. Ears: Deepgram Nova-2 STT via Browser WebSocket & Temp Token ---
     const startListening = async () => {
-        if (!DEEPGRAM_API_KEY) return;
+        try {
+            // A. Get a short-lived Deepgram token from backend
+            const { data } = await apolloClient.mutate<any>({
+                mutation: GET_DEEPGRAM_TOKEN
+            });
+            const token = data?.getDeepgramToken;
+            if (!token) throw new Error("Could not fetch Deepgram token");
 
-        // Create Deepgram Client
-        const deepgram = createClient(DEEPGRAM_API_KEY);
-        const live = deepgram.listen.live({
-            model: "nova-2",
-            interim_results: true,
-            smart_format: true,
-            filler_words: true,
-            endpointing: 1200, // 1.2s silence
-        });
+            // B. Connect directly to Deepgram WebSocket via native browser API
+            const wsUrl = `wss://api.deepgram.com/v1/listen?token=${token}&model=nova-2&interim_results=true&smart_format=true&filler_words=true&endpointing=1200`;
+            const ws = new WebSocket(wsUrl);
+            deepgramLiveRef.current = ws;
 
-        deepgramLiveRef.current = live;
+            ws.onopen = () => {
+                console.log("Deepgram STT WebSocket Connected");
+                setStatus('LISTENING');
+            };
 
-        live.on(LiveTranscriptionEvents.Open, () => {
-            console.log("Deepgram STT Connected");
-            setStatus('LISTENING');
-        });
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    const transcriptText = data.channel?.alternatives?.[0]?.transcript;
+                    if (transcriptText) {
+                        setTranscript(transcriptText);
 
-        live.on(LiveTranscriptionEvents.Transcript, (data) => {
-            const transcriptText = data.channel.alternatives[0].transcript;
-            if (transcriptText) {
-                setTranscript(transcriptText);
+                        // Interrupt logic: If user starts speaking while AI is talking, stop playback
+                        if (isSpeakingRef.current) {
+                            if (audioContextRef.current) {
+                                audioContextRef.current.suspend();
+                                audioContextRef.current.resume(); // Reset context to stop sound
+                            }
+                            isSpeakingRef.current = false;
+                        }
 
-                // Interrupt logic
-                if (isSpeakingRef.current) {
-                    // Stop audio playback
-                    if (audioContextRef.current) {
-                        audioContextRef.current.suspend();
-                        audioContextRef.current.resume(); // Reset context to stop sound
+                        // Handle silence/final result
+                        if (data.is_final) {
+                            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+                            silenceTimerRef.current = setTimeout(() => {
+                                generateResponse(transcriptText);
+                            }, 1200);
+                        }
                     }
-                    isSpeakingRef.current = false;
+                } catch (e) {
+                    console.error("Error parsing STT message:", e);
                 }
+            };
 
-                // Handle silence/final result
-                if (data.is_final) {
-                    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-                    silenceTimerRef.current = setTimeout(() => {
-                        generateResponse(transcriptText);
-                    }, 1200);
+            ws.onerror = (error) => {
+                console.error("Deepgram STT WebSocket Error:", error);
+            };
+
+            ws.onclose = () => {
+                console.log("Deepgram STT WebSocket Closed");
+            };
+
+            // Capture Audio
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            mediaRecorderRef.current = mediaRecorder;
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+                    ws.send(event.data);
                 }
+            };
+
+            mediaRecorder.start(250); // Send chunks every 250ms
+
+            // Initial Greet
+            if (history.length === 0) {
+                speak(`Hi ${candidateName}, thanks for joining. I'm Sarah, a recruiter here at ${companyName}. Shall we start the interview for the ${jobTitle} position?`);
+                setHistory([{ role: 'assistant', content: "Welcome message sent." }]);
             }
-        });
-
-        // Capture Audio
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-        mediaRecorderRef.current = mediaRecorder;
-
-        mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0 && live.getReadyState() === 1) {
-                live.send(event.data);
-            }
-        };
-
-        mediaRecorder.start(250); // Send chunks every 250ms
-
-        // Initial Greet
-        if (history.length === 0) {
-            speak(`Hi ${candidateName}, thanks for joining. I'm Sarah, a recruiter here at ${companyName}. Shall we start the interview for the ${jobTitle} position?`);
-            setHistory([{ role: 'assistant', content: "Welcome message sent." }]);
+        } catch (err: any) {
+            console.error('STT setup error:', err);
+            toast.error('Could not connect to voice service. Please try again.');
         }
     };
 
     useEffect(() => {
-        // Basic setup for AudioContext on first user interaction or mount
+        // Setup AudioContext on mount
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
 
         return () => {
-            if (deepgramLiveRef.current) deepgramLiveRef.current.finish();
-            if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
+            if (deepgramLiveRef.current && deepgramLiveRef.current.readyState === WebSocket.OPEN) {
+                deepgramLiveRef.current.close();
+            }
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                mediaRecorderRef.current.stop();
+            }
             if (audioContextRef.current) audioContextRef.current.close();
         };
     }, []);

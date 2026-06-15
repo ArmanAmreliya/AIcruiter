@@ -4,6 +4,7 @@ import { ApolloServer } from '@apollo/server';
 import fastifyApollo, { fastifyApolloDrainPlugin } from '@as-integrations/fastify';
 import dotenv from 'dotenv';
 import { prisma } from '@aicruiter/db';
+import { queueCandidateReportJob } from './services/queue';
 
 dotenv.config({ path: '../../.env' }); // Load .env from monorepo root
 
@@ -112,6 +113,7 @@ const typeDefs = `#graphql
     
     createCandidate(jobId: ID!, name: String!, email: String!): Candidate!
     updateCandidateInterviewStatus(id: ID!, status: String!, metaData: String): Candidate!
+    getDeepgramToken: String!
   }
 `;
 
@@ -278,13 +280,59 @@ const resolvers = {
       });
     },
     updateCandidateInterviewStatus: async (_parent: any, args: { id: string; status: string; metaData?: string }) => {
-      return prisma.candidate.update({
+      const candidate = await prisma.candidate.update({
         where: { id: args.id },
         data: {
           status: args.status,
           metaData: args.metaData ? JSON.parse(args.metaData) : undefined,
         }
       });
+
+      if (args.status === 'COMPLETED') {
+        // Trigger report generation (background SQS or local async)
+        // We do not await it so it runs out-of-band/background without blocking GraphQL response
+        queueCandidateReportJob(args.id).catch(err => {
+          console.error(`Error triggering candidate report job for ${args.id}:`, err);
+        });
+      }
+
+      return candidate;
+    },
+    getDeepgramToken: async () => {
+      const apiKey = process.env.VITE_DEEPGRAM_API_KEY;
+      if (!apiKey) throw new Error("Deepgram API key not configured on backend");
+
+      try {
+        // 1. Fetch project ID from Deepgram
+        const projectRes = await fetch('https://api.deepgram.com/v1/projects', {
+          headers: { 'Authorization': `Token ${apiKey}` }
+        });
+        if (!projectRes.ok) throw new Error("Failed to fetch projects from Deepgram");
+        const projectsData: any = await projectRes.json();
+        const projectId = projectsData.projects?.[0]?.project_id;
+        if (!projectId) throw new Error("No project found on Deepgram account");
+
+        // 2. Generate temporary key (TTL: 60s)
+        const keyRes = await fetch(`https://api.deepgram.com/v1/projects/${projectId}/keys`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Token ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            comment: 'Temporary client STT key',
+            scopes: ['usage:write'],
+            time_to_live_in_seconds: 60
+          })
+        });
+        if (!keyRes.ok) throw new Error("Failed to create temporary key");
+        const keyData: any = await keyRes.json();
+        return keyData.key;
+      } catch (error: any) {
+        console.warn("Deepgram token generation failed, falling back to main API key:", error.message || error);
+        // Fallback to main API key for local dev / offline tests
+        return apiKey;
+      }
     }
   }
 };
