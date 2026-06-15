@@ -1,5 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { apolloClient } from '../lib/apollo-client';
+import { 
+  GET_DASHBOARD_DATA, 
+  FETCH_JOB_BY_ID, 
+  CREATE_JOB, 
+  UPDATE_JOB, 
+  DELETE_JOB 
+} from '../lib/graphql-queries';
 import { User, Job, Activity, DashboardStats } from '../types';
 import { toast } from 'sonner';
 
@@ -9,17 +17,15 @@ export const useAiCruiter = () => {
   const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 1. Fetch Data from Supabase
+  // 1. Fetch Data from GraphQL
   const fetchJobById = async (jobId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('id', jobId)
-        .maybeSingle(); // Safer than .single() for potential missing data
-
-      if (error) throw error;
-      return data;
+      const { data } = await apolloClient.query<any>({
+        query: FETCH_JOB_BY_ID,
+        variables: { id: jobId },
+        fetchPolicy: 'network-only',
+      });
+      return data?.job || null;
     } catch (error: any) {
       console.error("Fetch job error:", error);
       toast.error(error.message || "Failed to fetch job details");
@@ -37,73 +43,49 @@ export const useAiCruiter = () => {
         return;
       }
 
-      console.log("Fetching dashboard data for user:", authUser.id);
+      console.log("Fetching dashboard data via GraphQL for user:", authUser.id);
 
-      // A. Fetch Profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .maybeSingle();
+      const { data } = await apolloClient.query<any>({
+        query: GET_DASHBOARD_DATA,
+        fetchPolicy: 'network-only',
+        context: {
+          headers: {
+            'x-user-id': authUser.id,
+          }
+        }
+      });
 
-      if (profileError) {
-        console.error("Profile fetch error:", profileError);
-      }
-
-      if (profile) {
+      if (data?.me) {
         setUser({
-          id: profile.id,
-          name: profile.full_name || 'Recruiter',
-          company: profile.company_name || 'Company',
-          role: profile.role || 'Recruiter',
-          aiCredits: profile.ai_credits || 0,
-          email: profile.email || '',
+          id: data.me.id,
+          name: data.me.fullName || 'Recruiter',
+          company: data.me.companyName || 'Company',
+          role: data.me.role || 'Recruiter',
+          aiCredits: data.me.aiCredits || 0,
+          email: data.me.email || '',
         });
       }
 
-      // B. Fetch Jobs (Explicitly use site-generated relationship name to avoid ambiguity)
-      const { data: jobsData, error: jobsError } = await supabase
-        .from('jobs')
-        .select('*, candidates!candidates_job_id_fkey(count)')
-        .eq('user_id', authUser.id)
-        .order('created_at', { ascending: false });
-
-      if (jobsError) {
-        console.error("Jobs fetch error:", jobsError);
-      }
-
-      if (jobsData) {
-        const formattedJobs: Job[] = jobsData.map((j: any) => ({
+      if (data?.jobs) {
+        const formattedJobs: Job[] = data.jobs.map((j: any) => ({
           id: j.id,
           title: j.title,
           description: j.description,
           status: j.status,
-          candidateCount: j.candidates?.[0]?.count || 0, // Count from relation
-          location: j.location,
-          createdAt: j.created_at,
+          candidateCount: j.candidateCount || 0,
+          location: 'Remote',
+          createdAt: j.createdAt,
         }));
         setJobs(formattedJobs);
       }
 
-      // C. Fetch Activities
-      const { data: activityData, error: activityError } = await supabase
-        .from('activities')
-        .select('*')
-        .eq('user_id', authUser.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (activityError) {
-        console.error("Activities fetch error:", activityError);
-      }
-
-      if (activityData) {
-        setRecentActivity(activityData.map((a: any) => ({
+      if (data?.activities) {
+        setRecentActivity(data.activities.map((a: any) => ({
           id: a.id,
           type: a.type,
           message: a.message,
           subtitle: a.subtitle,
-          timestamp: a.created_at,
+          timestamp: a.timestamp,
           score: a.score
         })));
       }
@@ -115,12 +97,11 @@ export const useAiCruiter = () => {
     }
   };
 
-  // Initial Fetch
   // Initial Fetch & Realtime Subscription
   useEffect(() => {
     fetchData();
 
-    // Subscribe to specific tables for Realtime updates
+    // Subscribe to specific tables for Realtime updates from Supabase triggers
     const channel = supabase.channel('dashboard_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
         fetchData();
@@ -151,7 +132,7 @@ export const useAiCruiter = () => {
     };
   }, [jobs, user]);
 
-  // 3. Create Job Function (Connected to Real DB)
+  // 3. Create Job Function via GraphQL
   const createJob = async (
     title: string,
     description: string,
@@ -160,37 +141,27 @@ export const useAiCruiter = () => {
   ) => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error("Not authenticated");
 
-      // Insert into Supabase
-      const { data, error } = await supabase.from('jobs').insert({
-        user_id: user.id,
-        title, // This maps to 'title', used as Job Position
-        job_role: title, // Storing title as role too for now if schema requires
-        description,
-        duration_minutes: duration,
-        interview_type: interviewTypes,
-        status: 'ACTIVE',
-        location: 'Remote' // Default
-      })
-        .select()
-        .maybeSingle();
-
-      if (error) throw error;
-
-      // Add Activity Log
-      await supabase.from('activities').insert({
-        user_id: user.id,
-        type: 'SYSTEM',
-        message: 'New Job Created',
-        subtitle: `${title} is now active`
+      const { data } = await apolloClient.mutate<any>({
+        mutation: CREATE_JOB,
+        variables: {
+          title,
+          description,
+          durationMinutes: duration,
+          interviewType: interviewTypes
+        },
+        context: {
+          headers: {
+            'x-user-id': authUser.id,
+          }
+        }
       });
 
       // Refresh Data
       await fetchData();
-
-      return data;
+      return data?.createJob;
 
     } catch (error: any) {
       toast.error(error.message);
@@ -200,7 +171,7 @@ export const useAiCruiter = () => {
     }
   };
 
-  // 4. Update Job Function
+  // 4. Update Job Function via GraphQL
   const updateJob = async (
     jobId: string,
     updates: {
@@ -214,7 +185,6 @@ export const useAiCruiter = () => {
   ) => {
     setLoading(true);
 
-    // Get current user to ensure we are filtering by owner for RLS safety
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser) {
       toast.error("You must be logged in to update an interview");
@@ -225,28 +195,36 @@ export const useAiCruiter = () => {
     // Optimistic Update: Update UI immediately
     setJobs(prev => prev.map(job =>
       job.id === jobId
-        ? { ...job, ...updates, title: updates.title || job.title }
+        ? { 
+            ...job, 
+            title: updates.title || job.title,
+            description: updates.description || job.description,
+            status: updates.status || job.status
+          }
         : job
     ));
 
     try {
-      // Use maybeSingle() and explicitly filter by user_id for RLS clarity
-      const { data, error } = await supabase
-        .from('jobs')
-        .update(updates)
-        .eq('id', jobId)
-        .eq('user_id', authUser.id)
-        .select()
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (!data) {
-        throw new Error("Interview not found or permission denied");
-      }
+      const { data } = await apolloClient.mutate<any>({
+        mutation: UPDATE_JOB,
+        variables: {
+          id: jobId,
+          title: updates.title,
+          description: updates.description,
+          durationMinutes: updates.duration_minutes,
+          interviewType: updates.interview_type,
+          status: updates.status
+        },
+        context: {
+          headers: {
+            'x-user-id': authUser.id,
+          }
+        }
+      });
 
       toast.success("Interview updated successfully");
-      return data;
+      await fetchData();
+      return data?.updateJob;
     } catch (error: any) {
       console.error("Update job error:", error);
       toast.error(error.message || "Failed to update interview");
@@ -257,28 +235,22 @@ export const useAiCruiter = () => {
     }
   };
 
-  // 5. Delete Job Function
+  // 5. Delete Job Function via GraphQL
   const deleteJob = async (jobId: string) => {
     // Optimistic Update: Remove immediately from UI
     setJobs((prev) => prev.filter((job) => job.id !== jobId));
 
-    // Also remove from stats locally
-    // (Optional: deep clone stats and decrement activeJobs, but re-calculation via useMemo handles it if 'jobs' changes)
-
     try {
-      const { error } = await supabase
-        .from('jobs')
-        .delete()
-        .eq('id', jobId);
+      const { data } = await apolloClient.mutate<any>({
+        mutation: DELETE_JOB,
+        variables: { id: jobId }
+      });
 
-      if (error) throw error;
-
-      toast.success("Interview deleted successfully");
-
-      // Background validation (optional, can skip if confident)
-      // await fetchData(); 
+      if (data?.deleteJob) {
+        toast.success("Interview deleted successfully");
+      }
+      await fetchData(); 
     } catch (error: any) {
-      // Revert if failed
       toast.error(error.message || "Failed to delete interview");
       await fetchData(); // Force re-fetch to restore state
     }

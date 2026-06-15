@@ -19,6 +19,8 @@ import { PageLoader } from '../ui/PageLoader';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 import { Link } from 'react-router-dom';
+import { apolloClient } from '../../lib/apollo-client';
+import { GET_CANDIDATES, UPDATE_CANDIDATE_STATUS } from '../../lib/graphql-queries';
 
 // --- Types ---
 type CandidateStatus = 'Pending' | 'Accepted' | 'Rejected';
@@ -41,34 +43,36 @@ export const CandidatesPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<CandidateStatus | 'All'>('All');
 
-  // Fetch Candidates from Supabase
+  // Fetch Candidates from GraphQL
   const fetchCandidates = async () => {
     setLoading(true);
     try {
-      // Use the explicit system-generated relationship name to resolve ambiguity
-      const { data, error } = await supabase
-        .from('candidates')
-        .select('*, jobs!candidates_job_id_fkey(title)');
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const { data } = await apolloClient.query<any>({
+        query: GET_CANDIDATES,
+        fetchPolicy: 'network-only',
+        context: {
+          headers: {
+            'x-user-id': authUser?.id || '',
+          }
+        }
+      });
 
-      if (error) throw error;
-
-      if (data) {
-        const formattedCandidates: Candidate[] = data.map((c: any) => ({
+      if (data?.candidates) {
+        const formattedCandidates: Candidate[] = data.candidates.map((c: any) => ({
           id: c.id,
           name: c.name || 'Unknown Candidate',
-          role: (c as any).jobs?.title || 'Unknown Role', // Access via explicit join key
-          matchScore: c.overall_score || 0,
+          role: c.job?.title || 'Unknown Role',
+          matchScore: c.overallScore || 0,
           status: (c.status as CandidateStatus) || 'Pending',
-          appliedDate: c.created_at || new Date().toISOString(),
-          jobId: c.job_id,
-          // usage of UI avatars API for consistent avatars based on name
+          appliedDate: c.createdAt || new Date().toISOString(),
+          jobId: c.jobId,
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name || 'User')}&background=random`
         }));
         setCandidates(formattedCandidates);
       }
     } catch (error) {
       console.error('Error fetching candidates:', error);
-      // toast.error('Failed to load candidates');
     } finally {
       setLoading(false);
     }
@@ -102,12 +106,10 @@ export const CandidatesPage = () => {
         c.id === id ? { ...c, status: newStatus } : c
       ));
 
-      const { error } = await supabase
-        .from('candidates')
-        .update({ status: newStatus })
-        .eq('id', id);
-
-      if (error) throw error;
+      await apolloClient.mutate({
+        mutation: UPDATE_CANDIDATE_STATUS,
+        variables: { id, status: newStatus }
+      });
 
       const candidateName = candidates.find(c => c.id === id)?.name;
       const action = newStatus === 'Accepted' ? 'accepted' : 'rejected';

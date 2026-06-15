@@ -18,6 +18,8 @@ import { PageLoader } from '../ui/PageLoader';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../context/ThemeContext';
 import { cn } from '../../lib/utils';
+import { apolloClient } from '../../lib/apollo-client';
+import { CREATE_CANDIDATE } from '../../lib/graphql-queries';
 import { toast } from 'sonner';
 
 // Types (should ideally be in a types file)
@@ -95,39 +97,24 @@ export const InterviewLobby = () => {
 
         setIsJoining(true);
         try {
-            // 1. Insert Candidate
-            const { data, error } = await supabase
-                .from('candidates')
-                .insert({
-                    job_id: uniqueId,
+            // 1. Insert Candidate via GraphQL
+            const { data: mutateData } = await apolloClient.mutate<any>({
+                mutation: CREATE_CANDIDATE,
+                variables: {
+                    jobId: uniqueId,
                     name: name,
                     email: email,
-                    status: 'STARTED',
-                    meta_data: {
-                        userAgent: navigator.userAgent,
-                        platform: navigator.platform,
-                        language: navigator.language
-                    }
-                })
-                .select()
-                .single();
+                }
+            });
 
-            if (error) throw error;
+            const candidate = mutateData?.createCandidate;
+            if (!candidate) throw new Error("Failed to register candidate");
 
             // 2. Success Feedback
             toast.success('Registered successfully! Entering interview room...');
 
             // 3. Navigate to Active Room
-            // We pass the candidate ID via state or URL if the room route supports it
-            // Standard practice: /interview/:jobId/room?candidateId=... or similar
-            // For now, let's assume the simulation page will read query params or we just replace common view
-            // The prompt says "Navigate to the Active Interview Room". 
-            // I'll assume a new route structure or using state. 
-            // Let's use React Router state to pass sensitive data cleanly.
-
-            // Note: The user said "we will build this next". 
-            // I'll navigate to a 'room' sub-path or query param to indicate readiness.
-            navigate(`/interview/${uniqueId}/room`, { state: { candidateId: data.id, candidateName: data.name } });
+            navigate(`/interview/${uniqueId}/room`, { state: { candidateId: candidate.id, candidateName: candidate.name } });
 
         } catch (err: any) {
             console.error('Join error:', err);

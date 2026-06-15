@@ -6,6 +6,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { cn } from '../../lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
+import { apolloClient } from '../../lib/apollo-client';
+import { UPDATE_CANDIDATE_INTERVIEW_STATUS } from '../../lib/graphql-queries';
 
 export const ThankYouPage = () => {
     const navigate = useNavigate();
@@ -27,22 +29,23 @@ export const ThankYouPage = () => {
 
         setIsSubmitting(true);
         try {
-            // Update candidate status to COMPLETED and save feedback
+            // Update candidate status to COMPLETED and save feedback via GraphQL
             if (candidateId) {
-                const { error } = await supabase
-                    .from('candidates')
-                    .update({
-                        status: 'COMPLETED',
-                        meta_data: {
-                            ...(location.state?.meta_data || {}),
-                            rating,
-                            feedback,
-                            completed_at: new Date().toISOString()
-                        }
-                    })
-                    .eq('id', candidateId);
+                const meta = {
+                    ...(location.state?.meta_data || {}),
+                    rating,
+                    feedback,
+                    completed_at: new Date().toISOString()
+                };
 
-                if (error) throw error;
+                await apolloClient.mutate({
+                    mutation: UPDATE_CANDIDATE_INTERVIEW_STATUS,
+                    variables: {
+                        id: candidateId,
+                        status: 'COMPLETED',
+                        metaData: JSON.stringify(meta)
+                    }
+                });
             }
 
             setSubmitted(true);
