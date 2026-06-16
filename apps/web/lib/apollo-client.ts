@@ -6,8 +6,8 @@ const httpLink = createHttpLink({
 });
 
 const authLink = setContext(async (_, { headers }) => {
-  let userId = '';
-  if (typeof window !== 'undefined') {
+  let userId = headers?.['x-user-id'] || headers?.['X-User-Id'] || '';
+  if (!userId && typeof window !== 'undefined') {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.endsWith('-auth-token')) {
@@ -25,7 +25,7 @@ const authLink = setContext(async (_, { headers }) => {
   return {
     headers: {
       ...headers,
-      'x-user-id': userId,
+      ...(userId ? { 'x-user-id': userId } : {})
     }
   };
 });

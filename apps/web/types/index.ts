@@ -6,6 +6,7 @@ export interface User {
   role: string;
   aiCredits: number;
   email: string;
+  website?: string;
 }
 
 export interface Job {

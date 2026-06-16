@@ -23,7 +23,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 interface LoginPageProps {
   onBack: () => void;
   onNavigateSignup: () => void;
-  onLoginSuccess: () => void;
+  onLoginSuccess: (email?: string) => void;
 }
 
 export const LoginPage = ({ onBack, onNavigateSignup, onLoginSuccess }: LoginPageProps) => {
@@ -50,7 +50,7 @@ export const LoginPage = ({ onBack, onNavigateSignup, onLoginSuccess }: LoginPag
       toast.success(`Welcome back!`);
       // Add a slight delay to show the toast before transition
       setTimeout(() => {
-        onLoginSuccess();
+        onLoginSuccess(data.email);
       }, 500);
     } catch (error: any) {
       toast.error(error.message || "Invalid credentials");

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     User,
@@ -14,104 +14,133 @@ import {
     Shield,
     LogOut,
     Globe,
-    Sliders
+    Sliders,
+    Loader2
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAiCruiter } from '../../hooks/use-aicruiter';
 import { cn } from '../../lib/utils';
 import { toast } from 'sonner';
 
 // --- Tab Components ---
 
-const ProfileSettings = ({ theme }: { theme: string }) => (
-    <div className="space-y-6 animate-fade-in-up">
-        <div className="flex items-center gap-6">
-            <div className="relative group cursor-pointer">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-3xl font-bold text-white ring-4 ring-white dark:ring-zinc-800">
-                    AR
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                    <ImageIcon size={24} className="text-white" />
-                </div>
-            </div>
-            <div>
-                <h3 className={cn("text-lg font-bold", theme === 'light' ? "text-black" : "text-white")}>Profile Picture</h3>
-                <p className={cn("text-sm mb-3", theme === 'light' ? "text-gray-500" : "text-gray-400")}>
-                    PNG, JPG up to 5MB
-                </p>
-                <button className={cn(
-                    "px-4 py-2 rounded-lg text-sm font-medium transition-colors border",
-                    theme === 'light' ? "border-gray-200 hover:bg-gray-50 text-black" : "border-zinc-700 hover:bg-zinc-800 text-white"
-                )}>
-                    Upload New
-                </button>
-            </div>
-        </div>
+const ProfileSettings = ({
+    theme,
+    fullName,
+    setFullName,
+    email,
+    role,
+    setRole
+}: any) => {
+    const getInitials = (name: string) => {
+        const parts = name.trim().split(' ');
+        if (parts.length > 1) {
+            return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+        }
+        return (name.charAt(0) + (name.charAt(1) || '')).toUpperCase();
+    };
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-                <label className={cn("text-sm font-semibold", theme === 'light' ? "text-gray-700" : "text-gray-300")}>Full Name</label>
-                <input
-                    type="text"
-                    defaultValue="Arman Amreliya"
-                    className={cn(
-                        "w-full px-4 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-purple-500/20 transition-all",
-                        theme === 'light' ? "bg-white border-gray-200 text-black" : "bg-black border-zinc-800 text-white"
-                    )}
-                />
+    return (
+        <div className="space-y-6 animate-fade-in-up">
+            <div className="flex items-center gap-6">
+                <div className="relative group cursor-pointer">
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-3xl font-bold text-white ring-4 ring-white dark:ring-zinc-800">
+                        {getInitials(fullName || 'Recruiter')}
+                    </div>
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ImageIcon size={24} className="text-white" />
+                    </div>
+                </div>
+                <div>
+                    <h3 className={cn("text-lg font-bold", theme === 'light' ? "text-black" : "text-white")}>Profile Picture</h3>
+                    <p className={cn("text-sm mb-3", theme === 'light' ? "text-gray-500" : "text-gray-400")}>
+                        PNG, JPG up to 5MB
+                    </p>
+                    <button className={cn(
+                        "px-4 py-2 rounded-lg text-sm font-medium transition-colors border",
+                        theme === 'light' ? "border-gray-200 hover:bg-gray-50 text-black" : "border-zinc-700 hover:bg-zinc-800 text-white"
+                    )}>
+                        Upload New
+                    </button>
+                </div>
             </div>
-            <div className="space-y-2">
-                <label className={cn("text-sm font-semibold", theme === 'light' ? "text-gray-700" : "text-gray-300")}>Email Address</label>
-                <div className="relative">
-                    <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 opacity-50" />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                    <label className={cn("text-sm font-semibold", theme === 'light' ? "text-gray-700" : "text-gray-300")}>Full Name</label>
                     <input
-                        type="email"
-                        defaultValue="arman@aicruiter.com"
+                        type="text"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
                         className={cn(
-                            "w-full pl-11 pr-4 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-purple-500/20 transition-all",
+                            "w-full px-4 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-purple-500/20 transition-all",
                             theme === 'light' ? "bg-white border-gray-200 text-black" : "bg-black border-zinc-800 text-white"
                         )}
                     />
                 </div>
+                <div className="space-y-2">
+                    <label className={cn("text-sm font-semibold", theme === 'light' ? "text-gray-700" : "text-gray-300")}>Email Address</label>
+                    <div className="relative">
+                        <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 opacity-50" />
+                        <input
+                            type="email"
+                            value={email}
+                            disabled
+                            className={cn(
+                                "w-full pl-11 pr-4 py-3 rounded-xl border outline-none opacity-60 cursor-not-allowed",
+                                theme === 'light' ? "bg-gray-50 border-gray-200 text-black" : "bg-zinc-900 border-zinc-800 text-white"
+                            )}
+                        />
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <label className={cn("text-sm font-semibold", theme === 'light' ? "text-gray-700" : "text-gray-300")}>Job Title</label>
+                    <input
+                        type="text"
+                        value={role}
+                        onChange={(e) => setRole(e.target.value)}
+                        className={cn(
+                            "w-full px-4 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-purple-500/20 transition-all",
+                            theme === 'light' ? "bg-white border-gray-200 text-black" : "bg-black border-zinc-800 text-white"
+                        )}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <label className={cn("text-sm font-semibold", theme === 'light' ? "text-gray-700" : "text-gray-300")}>Phone Number</label>
+                    <input
+                        type="tel"
+                        defaultValue="+1 (555) 000-0000"
+                        disabled
+                        className={cn(
+                            "w-full px-4 py-3 rounded-xl border outline-none opacity-60 cursor-not-allowed",
+                            theme === 'light' ? "bg-gray-50 border-gray-200 text-black" : "bg-zinc-900 border-zinc-800 text-white"
+                        )}
+                    />
+                </div>
             </div>
+
             <div className="space-y-2">
-                <label className={cn("text-sm font-semibold", theme === 'light' ? "text-gray-700" : "text-gray-300")}>Job Title</label>
-                <input
-                    type="text"
-                    defaultValue="Senior Recruiter"
+                <label className={cn("text-sm font-semibold", theme === 'light' ? "text-gray-700" : "text-gray-300")}>Bio</label>
+                <textarea
+                    rows={4}
+                    defaultValue="Experienced recruiter screening premium talent using automated AI agents."
                     className={cn(
-                        "w-full px-4 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-purple-500/20 transition-all",
-                        theme === 'light' ? "bg-white border-gray-200 text-black" : "bg-black border-zinc-800 text-white"
-                    )}
-                />
-            </div>
-            <div className="space-y-2">
-                <label className={cn("text-sm font-semibold", theme === 'light' ? "text-gray-700" : "text-gray-300")}>Phone Number</label>
-                <input
-                    type="tel"
-                    defaultValue="+1 (555) 000-0000"
-                    className={cn(
-                        "w-full px-4 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-purple-500/20 transition-all",
+                        "w-full px-4 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-purple-500/20 transition-all resize-none",
                         theme === 'light' ? "bg-white border-gray-200 text-black" : "bg-black border-zinc-800 text-white"
                     )}
                 />
             </div>
         </div>
+    );
+};
 
-        <div className="space-y-2">
-            <label className={cn("text-sm font-semibold", theme === 'light' ? "text-gray-700" : "text-gray-300")}>Bio</label>
-            <textarea
-                rows={4}
-                defaultValue="Experienced technical recruiter specializing in AI and Machine Learning roles."
-                className={cn(
-                    "w-full px-4 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-purple-500/20 transition-all resize-none",
-                    theme === 'light' ? "bg-white border-gray-200 text-black" : "bg-black border-zinc-800 text-white"
-                )}
-            />
-        </div>
-    </div>
-);
-
-const CompanySettings = ({ theme }: { theme: string }) => (
+const CompanySettings = ({
+    theme,
+    companyName,
+    setCompanyName,
+    website,
+    setWebsite
+}: any) => (
     <div className="space-y-6 animate-fade-in-up">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
@@ -120,7 +149,8 @@ const CompanySettings = ({ theme }: { theme: string }) => (
                     <Building size={18} className="absolute left-4 top-1/2 -translate-y-1/2 opacity-50" />
                     <input
                         type="text"
-                        defaultValue="TechCorp Inc."
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
                         className={cn(
                             "w-full pl-11 pr-4 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-purple-500/20 transition-all",
                             theme === 'light' ? "bg-white border-gray-200 text-black" : "bg-black border-zinc-800 text-white"
@@ -134,7 +164,8 @@ const CompanySettings = ({ theme }: { theme: string }) => (
                     <Globe size={18} className="absolute left-4 top-1/2 -translate-y-1/2 opacity-50" />
                     <input
                         type="url"
-                        defaultValue="https://techcorp.com"
+                        value={website}
+                        onChange={(e) => setWebsite(e.target.value)}
                         className={cn(
                             "w-full pl-11 pr-4 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-purple-500/20 transition-all",
                             theme === 'light' ? "bg-white border-gray-200 text-black" : "bg-black border-zinc-800 text-white"
@@ -285,6 +316,23 @@ const SecuritySettings = ({ theme }: { theme: string }) => (
 export const SettingsPage = () => {
     const { theme } = useTheme();
     const [activeTab, setActiveTab] = useState('profile');
+    const { user, updateProfile } = useAiCruiter();
+
+    const [fullName, setFullName] = useState('');
+    const [role, setRole] = useState('');
+    const [companyName, setCompanyName] = useState('');
+    const [website, setWebsite] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Sync state with loaded user values
+    useEffect(() => {
+        if (user) {
+            setFullName(user.name || '');
+            setRole(user.role || '');
+            setCompanyName(user.company || '');
+            setWebsite(user.website || '');
+        }
+    }, [user]);
 
     const tabs = [
         { id: 'profile', label: 'My Profile', icon: User },
@@ -294,8 +342,17 @@ export const SettingsPage = () => {
         { id: 'billing', label: 'Billing', icon: CreditCard },
     ];
 
-    const handleSave = () => {
-        toast.success("Settings saved successfully");
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            await updateProfile(fullName, companyName, role, website);
+            toast.success("Settings saved successfully");
+        } catch (error: any) {
+            console.error("Failed to save settings:", error);
+            toast.error(error.message || "Failed to save settings");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (
@@ -343,16 +400,38 @@ export const SettingsPage = () => {
                         </h2>
                         <button
                             onClick={handleSave}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium text-sm transition-colors shadow-md shadow-green-500/20"
+                            disabled={isSaving}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium text-sm transition-colors shadow-md shadow-green-500/20 disabled:opacity-50"
                         >
-                            <Save size={16} />
-                            Save Changes
+                            {isSaving ? (
+                                <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                                <Save size={16} />
+                            )}
+                            {isSaving ? "Saving..." : "Save Changes"}
                         </button>
                     </div>
 
                     <div className="max-w-2xl">
-                        {activeTab === 'profile' && <ProfileSettings theme={theme} />}
-                        {activeTab === 'company' && <CompanySettings theme={theme} />}
+                        {activeTab === 'profile' && (
+                            <ProfileSettings
+                                theme={theme}
+                                fullName={fullName}
+                                setFullName={setFullName}
+                                email={user?.email || ''}
+                                role={role}
+                                setRole={setRole}
+                            />
+                        )}
+                        {activeTab === 'company' && (
+                            <CompanySettings
+                                theme={theme}
+                                companyName={companyName}
+                                setCompanyName={setCompanyName}
+                                website={website}
+                                setWebsite={setWebsite}
+                            />
+                        )}
                         {activeTab === 'notifications' && <NotificationSettings theme={theme} />}
                         {activeTab === 'security' && <SecuritySettings theme={theme} />}
                         {activeTab === 'billing' && (

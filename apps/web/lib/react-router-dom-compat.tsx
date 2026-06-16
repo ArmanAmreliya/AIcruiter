@@ -71,12 +71,13 @@ interface NavLinkMockProps {
   className?: string | ((props: { isActive: boolean }) => string | undefined);
   activeClassName?: string;
   style?: React.CSSProperties | ((props: { isActive: boolean }) => React.CSSProperties);
+  end?: boolean;
   [key: string]: any;
 }
 
-export function NavLink({ to, children, className, activeClassName, style, ...props }: NavLinkMockProps) {
-  const pathname = usePathname();
-  const isActive = pathname === to;
+export function NavLink({ to, children, className, activeClassName, style, end, ...props }: NavLinkMockProps) {
+  const pathname = usePathname() || '';
+  const isActive = end ? pathname === to : (pathname === to || pathname.startsWith(to + '/'));
   const combinedClass = typeof className === 'function' 
     ? className({ isActive }) 
     : `${className || ''} ${isActive ? activeClassName || 'active' : ''}`;

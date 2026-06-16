@@ -4,7 +4,7 @@ export const onboardingSchema = z.object({
   fullName: z.string().min(2, "Name is required"),
   role: z.string().min(1, "Role is required"),
   companyName: z.string().min(2, "Company name is required"),
-  website: z.string().url().optional().or(z.literal('')),
+  website: z.string().optional().or(z.literal('')),
 });
 
 export type OnboardingData = z.infer<typeof onboardingSchema>;

@@ -28,6 +28,12 @@
       ],
       "react-router-dom": [
         "./lib/react-router-dom-compat.tsx"
+      ],
+      "@aicruiter/types": [
+        "../../packages/types/index.ts"
+      ],
+      "@aicruiter/db": [
+        "../../packages/db/index.ts"
       ]
     }
   },

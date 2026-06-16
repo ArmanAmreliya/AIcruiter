@@ -9,6 +9,7 @@ export const GET_DASHBOARD_DATA = gql`
       role
       aiCredits
       email
+      website
     }
     jobs {
       id
@@ -25,6 +26,19 @@ export const GET_DASHBOARD_DATA = gql`
       subtitle
       timestamp
       score
+    }
+  }
+`;
+
+export const UPDATE_PROFILE = gql`
+  mutation UpdateProfile($fullName: String, $companyName: String, $role: String, $website: String) {
+    updateProfile(fullName: $fullName, companyName: $companyName, role: $role, website: $website) {
+      id
+      fullName
+      companyName
+      role
+      website
+      email
     }
   }
 `;

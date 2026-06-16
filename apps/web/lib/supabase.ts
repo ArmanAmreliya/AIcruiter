@@ -2,6 +2,15 @@ import { createClient } from '@supabase/supabase-js';
 
 // Safe access to environment variables in various environments
 const getEnv = (key: string): string | undefined => {
+  if (typeof window !== 'undefined') {
+    if (key === 'NEXT_SUPABASE_URL' || key === 'VITE_SUPABASE_URL') {
+      if ((window as any).__SUPABASE_URL__) return (window as any).__SUPABASE_URL__;
+    }
+    if (key === 'NEXT_SUPABASE_ANON_KEY' || key === 'VITE_SUPABASE_ANON_KEY') {
+      if ((window as any).__SUPABASE_ANON_KEY__) return (window as any).__SUPABASE_ANON_KEY__;
+    }
+  }
+
   let value: unknown;
   if (typeof process !== 'undefined' && process.env) {
     value = process.env[key];
@@ -31,16 +40,18 @@ const createMockClient = () => {
     auth: {
       signInWithPassword: async ({ email }: { email: string }) => {
         console.log("Mock Login Success for:", email);
-        return { data: { user: { email } }, error: null };
+        return { data: { user: { email, id: 'demo-recruiter-id-123' } }, error: null };
       },
       signInWithOAuth: async () => {
         return { data: { url: '#' }, error: null };
       },
       signUp: async ({ email }: { email: string }) => {
         console.log("Mock Signup Success for:", email);
-        return { data: { user: { email } }, error: null };
+        return { data: { user: { email, id: 'demo-recruiter-id-123' } }, error: null };
       },
       getSession: async () => ({ data: { session: null }, error: null }),
+      getUser: async () => ({ data: { user: { id: 'demo-recruiter-id-123', email: 'recruiter@example.com' } }, error: null }),
+      signOut: async () => ({ error: null }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => { } } } }),
     },
     channel: () => mockChannel,

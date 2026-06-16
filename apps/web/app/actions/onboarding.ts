@@ -1,57 +1,71 @@
-
 'use server';
 
-import { z } from 'zod';
-// In a real app, you would import the prisma client
-// import { prisma } from '../../lib/prisma';
+import { type OnboardingData } from '@aicruiter/types';
+import { prisma } from '@aicruiter/db';
 
-export const onboardingSchema = z.object({
-  fullName: z.string().min(2, "Name is required"),
-  role: z.string().min(1, "Role is required"),
-  companyName: z.string().min(2, "Company name is required"),
-  website: z.string().optional(),
-});
-
-export type OnboardingData = z.infer<typeof onboardingSchema>;
-
-// Mock implementation for the frontend demo environment
-// In production, this would query the database directly
 export async function checkOnboardingStatus(email: string) {
-  // Simulate delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // Check local storage for demo persistence
-  if (typeof window !== 'undefined') {
-    const isOnboarded = localStorage.getItem(`aicruiter_onboarded_${email}`);
-    return isOnboarded === 'true';
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { onboarded: true }
+    });
+    return user?.onboarded || false;
+  } catch (error) {
+    console.error("Failed to check onboarding status from DB:", error);
+    return false;
   }
-  
-  return false;
 }
 
 export async function submitOnboarding(email: string, data: OnboardingData) {
-  // Simulate delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  console.log("Submitting onboarding for:", email, data);
-  
-  // Persist to local storage for demo
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(`aicruiter_onboarded_${email}`, 'true');
-    localStorage.setItem(`aicruiter_user_${email}`, JSON.stringify(data));
-  }
-  
-  // In production:
-  // await prisma.user.update({
-  //   where: { email },
-  //   data: {
-  //     fullName: data.fullName,
-  //     role: data.role,
-  //     companyName: data.companyName,
-  //     website: data.website,
-  //     onboarded: true
-  //   }
-  // });
+  try {
+    console.log("Submitting onboarding for:", email, data);
 
-  return { success: true };
+    // 1. Check if the user is in auth.users by email to get their ID
+    const authUsers: any[] = await (prisma as any).$queryRawUnsafe(
+      `SELECT id FROM auth.users WHERE email = $1 LIMIT 1`,
+      email
+    ).catch(() => []);
+    
+    if (authUsers && authUsers.length > 0) {
+      const userId = authUsers[0].id;
+      // 2. Upsert the user profile in our public User table
+      await prisma.user.upsert({
+        where: { id: userId },
+        update: {
+          email,
+          fullName: data.fullName,
+          companyName: data.companyName,
+          role: data.role,
+          website: data.website || null,
+          onboarded: true
+        },
+        create: {
+          id: userId,
+          email,
+          fullName: data.fullName,
+          companyName: data.companyName,
+          role: data.role,
+          website: data.website || null,
+          aiCredits: 100,
+          onboarded: true
+        }
+      });
+    } else {
+      // Fallback: update by email if they already exist in the User table
+      await prisma.user.updateMany({
+        where: { email },
+        data: {
+          fullName: data.fullName,
+          companyName: data.companyName,
+          role: data.role,
+          website: data.website || null,
+          onboarded: true
+        }
+      });
+    }
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to submit onboarding:", error);
+    throw error;
+  }
 }

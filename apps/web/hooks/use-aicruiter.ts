@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabase';
 import { apolloClient } from '../lib/apollo-client';
 import { 
@@ -6,12 +7,14 @@ import {
   FETCH_JOB_BY_ID, 
   CREATE_JOB, 
   UPDATE_JOB, 
-  DELETE_JOB 
+  DELETE_JOB,
+  UPDATE_PROFILE
 } from '../lib/graphql-queries';
 import { User, Job, Activity, DashboardStats } from '../types';
 import { toast } from 'sonner';
 
 export const useAiCruiter = () => {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
@@ -40,6 +43,9 @@ export const useAiCruiter = () => {
       if (authError || !authUser) {
         console.warn("No authenticated user found for dashboard fetch:", authError);
         setLoading(false);
+        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/dashboard')) {
+          router.push('/login');
+        }
         return;
       }
 
@@ -63,6 +69,7 @@ export const useAiCruiter = () => {
           role: data.me.role || 'Recruiter',
           aiCredits: data.me.aiCredits || 0,
           email: data.me.email || '',
+          website: data.me.website || '',
         });
       }
 
@@ -256,8 +263,39 @@ export const useAiCruiter = () => {
     }
   };
 
+  const updateProfile = async (fullName?: string, companyName?: string, role?: string, website?: string) => {
+    setLoading(true);
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error("Not authenticated");
+
+      const { data } = await apolloClient.mutate<any>({
+        mutation: UPDATE_PROFILE,
+        variables: {
+          fullName,
+          companyName,
+          role,
+          website
+        },
+        context: {
+          headers: {
+            'x-user-id': authUser.id,
+          }
+        }
+      });
+
+      await fetchData();
+      return data?.updateProfile;
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update profile");
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
-    user: user || { name: 'Loading...', company: '...', aiCredits: 0, email: '', id: '', role: '' }, // Safe default
+    user: user || { name: 'Loading...', company: '...', aiCredits: 0, email: '', id: '', role: '', website: '' }, // Safe default
     jobs,
     recentActivity,
     stats,
@@ -266,6 +304,7 @@ export const useAiCruiter = () => {
     deleteJob,
     fetchJobById,
     loading,
-    refreshData: fetchData
+    refreshData: fetchData,
+    updateProfile
   };
 };

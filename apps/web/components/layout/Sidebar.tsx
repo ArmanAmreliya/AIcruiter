@@ -5,10 +5,17 @@ import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
 import { useAiCruiter } from '../../hooks/use-aicruiter';
 import { Link } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
 
 export const Sidebar = () => {
   const { theme } = useTheme();
   const { user } = useAiCruiter();
+
+  const handleSignOut = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    await supabase.auth.signOut();
+    window.location.href = '/login';
+  };
 
   const links = [
     { name: 'Overview', href: '/dashboard', icon: LayoutGrid },
@@ -86,10 +93,10 @@ export const Sidebar = () => {
           </div>
         </div>
 
-        <NavLink
-          to="/login"
+        <button
+          onClick={handleSignOut}
           className={cn(
-            "w-full flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+            "w-full flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left",
             theme === 'light'
               ? "text-red-600 hover:bg-red-50"
               : "text-red-400 hover:bg-red-900/20"
@@ -97,7 +104,7 @@ export const Sidebar = () => {
         >
           <LogOut size={16} />
           Sign Out
-        </NavLink>
+        </button>
       </div>
     </aside>
   );

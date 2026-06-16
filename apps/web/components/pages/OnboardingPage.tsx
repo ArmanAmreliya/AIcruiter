@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Check, Building2, User, Globe } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { cn } from '../../lib/utils';
-import { submitOnboarding, onboardingSchema, type OnboardingData } from '../../app/actions/onboarding';
+import { submitOnboarding } from '../../app/actions/onboarding';
+import { onboardingSchema, type OnboardingData } from '@aicruiter/types';
 
 interface OnboardingPageProps {
   userEmail: string;
@@ -182,19 +183,25 @@ export const OnboardingPage = ({ userEmail, onComplete }: OnboardingPageProps) =
                        {errors.companyName && <p className="text-xs text-red-500 font-medium ml-1">{errors.companyName.message}</p>}
                      </div>
 
-                     <div className="space-y-2">
-                       <label className="text-sm font-bold flex items-center justify-between">
-                         Website <span className="text-gray-400 font-normal text-xs">Optional</span>
-                       </label>
-                       <div className="relative">
-                         <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                         <input 
-                           {...register('website')}
-                           placeholder="www.acme.com"
-                           className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-black/5 bg-white outline-none transition-all focus:border-purple-600 focus:ring-4 focus:ring-purple-600/10"
-                         />
-                       </div>
-                     </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold flex items-center justify-between">
+                          Website <span className="text-gray-400 font-normal text-xs">Optional</span>
+                        </label>
+                        <div className="relative">
+                          <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                          <input 
+                            {...register('website')}
+                            placeholder="www.acme.com"
+                            className={cn(
+                              "w-full pl-12 pr-4 py-4 rounded-2xl border-2 bg-white outline-none transition-all focus:ring-2",
+                              errors.website
+                                ? "border-red-500 focus:ring-red-500/20"
+                                : "border-black/5 focus:border-purple-600 focus:ring-4 focus:ring-purple-600/10"
+                            )}
+                          />
+                        </div>
+                        {errors.website && <p className="text-xs text-red-500 font-medium ml-1">{errors.website.message}</p>}
+                      </div>
                    </div>
 
                    <div className="flex gap-4 mt-8">

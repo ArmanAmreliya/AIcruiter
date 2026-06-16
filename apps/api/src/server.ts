@@ -15,15 +15,50 @@ async function ensureUser(userId: string) {
   try {
     let user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
+      let email = 'recruiter@example.com';
+      let fullName = 'Demo Recruiter';
+      let companyName = 'AIcruiter Inc.';
+      let role = 'Lead Recruiter';
+      let onboarded = true;
+
+      const isDemo = userId === 'demo-recruiter-id-123';
+
+      if (!isDemo) {
+        onboarded = false;
+        fullName = 'New Recruiter';
+        companyName = 'Company Inc.';
+        role = 'Hiring Manager';
+        try {
+          const authUsers: any[] = await (prisma as any).$queryRawUnsafe(
+            `SELECT email, raw_user_meta_data FROM auth.users WHERE id = $1::uuid LIMIT 1`,
+            userId
+          );
+          if (authUsers && authUsers.length > 0) {
+            email = authUsers[0].email || 'new-user@example.com';
+            const meta = authUsers[0].raw_user_meta_data;
+            if (meta && typeof meta === 'object' && meta !== null) {
+              fullName = meta.full_name || fullName;
+            } else if (meta && typeof meta === 'string') {
+              try {
+                const parsed = JSON.parse(meta);
+                fullName = parsed.full_name || fullName;
+              } catch(e) {}
+            }
+          }
+        } catch (err) {
+          console.warn(`Could not query auth.users for ${userId}:`, err);
+        }
+      }
+
       user = await prisma.user.create({
         data: {
           id: userId,
-          email: 'recruiter@example.com',
-          fullName: 'Demo Recruiter',
-          companyName: 'AIcruiter Inc.',
-          role: 'Lead Recruiter',
+          email,
+          fullName,
+          companyName,
+          role,
           aiCredits: 100,
-          onboarded: true,
+          onboarded,
         }
       });
     }
