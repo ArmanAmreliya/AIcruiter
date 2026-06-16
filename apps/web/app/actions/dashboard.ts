@@ -2,7 +2,7 @@
 'use server';
 
 import { z } from 'zod';
-import { prisma } from '../../lib/prisma';
+import { prisma } from '@aicruiter/db';
 
 // Define the schema for the return object
 const DashboardStatsSchema = z.object({

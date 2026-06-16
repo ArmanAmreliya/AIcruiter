@@ -17,9 +17,10 @@ import { LoadingLogo } from '../ui/LoadingLogo';
 import { PageLoader } from '../ui/PageLoader';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../context/ThemeContext';
+import { MediaPreview } from './MediaPreview';
 import { cn } from '../../lib/utils';
 import { apolloClient } from '../../lib/apollo-client';
-import { CREATE_CANDIDATE } from '../../lib/graphql-queries';
+import { CREATE_CANDIDATE, FETCH_JOB_BY_ID } from '../../lib/graphql-queries';
 import { toast } from 'sonner';
 
 // Types (should ideally be in a types file)
@@ -49,6 +50,12 @@ export const InterviewLobby = () => {
     // System Check State
     const [checkingSystem, setCheckingSystem] = useState(false);
 
+    // Media Testing State
+    const [showTestModal, setShowTestModal] = useState(false);
+    const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
+    const [isMuted, setIsMuted] = useState(false);
+    const [mediaError, setMediaError] = useState<string | null>(null);
+
     useEffect(() => {
         fetchJobDetails();
     }, [uniqueId]);
@@ -57,27 +64,19 @@ export const InterviewLobby = () => {
         if (!uniqueId) return;
         try {
             setIsLoading(true);
-            // Fetch job and joining the creator's profile content for company name
-            // Note: This assumes a relationship exists or we can fetch sequentially
-            const { data: jobData, error } = await supabase
-                .from('jobs')
-                .select('*')
-                .eq('id', uniqueId)
-                .single();
+            const { data } = await apolloClient.query<any>({
+                query: FETCH_JOB_BY_ID,
+                variables: { id: uniqueId },
+                fetchPolicy: 'network-only',
+            });
 
-            if (error) throw error;
+            const jobData = data?.job;
+            if (!jobData) throw new Error("Job not found");
+
             setJob(jobData);
 
-            // Try to fetch company name from profile if user_id exists
-            if (jobData?.user_id) {
-                const { data: profileData } = await supabase
-                    .from('profiles')
-                    .select('company_name')
-                    .eq('id', jobData.user_id)
-                    .single();
-                if (profileData?.company_name) {
-                    setCompanyName(profileData.company_name);
-                }
+            if (jobData.user?.companyName) {
+                setCompanyName(jobData.user.companyName);
             }
 
         } catch (err: any) {
@@ -113,6 +112,12 @@ export const InterviewLobby = () => {
             // 2. Success Feedback
             toast.success('Registered successfully! Entering interview room...');
 
+            // Store in sessionStorage to persist across page refresh
+            if (typeof window !== 'undefined') {
+                sessionStorage.setItem(`candidateId_${uniqueId}`, candidate.id);
+                sessionStorage.setItem(`candidateName_${uniqueId}`, candidate.name);
+            }
+
             // 3. Navigate to Active Room
             navigate(`/interview/${uniqueId}/room`, { state: { candidateId: candidate.id, candidateName: candidate.name } });
 
@@ -124,9 +129,24 @@ export const InterviewLobby = () => {
         }
     };
 
-    const handleTestSystem = () => {
-        // Placeholder for modal or check
-        toast.info("System check: Functional (Mock)");
+    const handleTestSystem = async () => {
+        setShowTestModal(true);
+        setMediaError(null);
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            setMediaStream(stream);
+        } catch (err: any) {
+            console.error("Media acquisition error:", err);
+            setMediaError(err.message || "Failed to access camera/microphone");
+        }
+    };
+
+    const handleCloseTest = () => {
+        setShowTestModal(false);
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+            setMediaStream(null);
+        }
     };
 
     if (isLoading) {
@@ -178,7 +198,7 @@ export const InterviewLobby = () => {
                             <div className="flex items-center gap-2 mt-2 text-sm text-gray-500 dark:text-gray-400 font-medium">
                                 <span>{companyName}</span>
                                 <span>•</span>
-                                <span className="flex items-center gap-1"><Clock size={14} /> {job.duration_minutes || 15} min</span>
+                                <span className="flex items-center gap-1"><Clock size={14} /> {job.durationMinutes || 15} min</span>
                             </div>
                         </div>
                         <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400">
@@ -288,6 +308,51 @@ export const InterviewLobby = () => {
                 By joining, you agree to our Terms of Service and Privacy Policy. This interview will be recorded for review purposes.
             </div>
 
+            <AnimatePresence>
+                {showTestModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 0.6 }}
+                            exit={{ opacity: 0 }}
+                            onClick={handleCloseTest}
+                            className="absolute inset-0 bg-black"
+                        />
+                        
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className={cn(
+                                "relative w-full max-w-lg rounded-3xl p-6 md:p-8 shadow-2xl border z-10",
+                                theme === 'light' ? "bg-white border-gray-100" : "bg-zinc-900 border-zinc-800"
+                            )}
+                        >
+                            <h3 className="text-xl font-bold mb-4">Device Preview Test</h3>
+                            <p className={cn("text-sm mb-6", theme === 'light' ? "text-gray-500" : "text-gray-400")}>
+                                Check your camera feedback and speak into your microphone to verify audio levels.
+                            </p>
+                            
+                            <div className="mb-6">
+                                <MediaPreview 
+                                    stream={mediaStream}
+                                    isMuted={isMuted}
+                                    onToggleMute={() => setIsMuted(!isMuted)}
+                                    error={mediaError}
+                                />
+                            </div>
+                            
+                            <button 
+                                type="button"
+                                onClick={handleCloseTest}
+                                className="w-full py-3.5 bg-black text-white dark:bg-white dark:text-black rounded-xl font-bold text-sm shadow-md transition-all active:scale-[0.98]"
+                            >
+                                Everything works, close preview
+                            </button>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

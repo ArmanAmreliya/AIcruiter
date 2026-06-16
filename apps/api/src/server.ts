@@ -3,10 +3,11 @@ import cors from '@fastify/cors';
 import { ApolloServer } from '@apollo/server';
 import fastifyApollo, { fastifyApolloDrainPlugin } from '@as-integrations/fastify';
 import dotenv from 'dotenv';
+import path from 'path';
 import { prisma } from '@aicruiter/db';
 import { queueCandidateReportJob } from './services/queue';
 
-dotenv.config({ path: '../../.env' }); // Load .env from monorepo root
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') }); // Load .env from monorepo root
 
 // Default fallback user ID for demo/dev purposes
 const DEFAULT_USER_ID = 'demo-recruiter-id-123';
@@ -97,6 +98,7 @@ const typeDefs = `#graphql
     updatedAt: String!
     candidateCount: Int!
     candidates: [Candidate!]
+    user: User
   }
 
   type Candidate {
@@ -219,6 +221,9 @@ const resolvers = {
     },
     candidates: async (parent: any) => {
       return prisma.candidate.findMany({ where: { jobId: parent.id } });
+    },
+    user: async (parent: any) => {
+      return prisma.user.findUnique({ where: { id: parent.userId } });
     }
   },
 
@@ -239,6 +244,10 @@ const resolvers = {
   },
 
   Activity: {
+    type: (parent: any) => parent.action || 'SYSTEM',
+    message: (parent: any) => parent.details || 'Activity logged',
+    subtitle: (parent: any) => null,
+    score: (parent: any) => null,
     timestamp: (parent: any) => {
       return parent.createdAt.toISOString();
     }
@@ -399,6 +408,43 @@ const startServer = async () => {
 
   fastify.get('/health', async () => {
     return { status: 'OK' };
+  });
+
+  fastify.post('/api/speak', async (request, reply) => {
+    const { text } = request.body as { text: string };
+    if (!text) {
+      reply.status(400).send({ error: "Text parameter is required" });
+      return;
+    }
+
+    const apiKey = process.env.NEXT_DEEPGRAM_API_KEY || process.env.VITE_DEEPGRAM_API_KEY;
+    if (!apiKey) {
+      reply.status(500).send({ error: "Deepgram API key not configured on backend" });
+      return;
+    }
+
+    try {
+      const response = await fetch('https://api.deepgram.com/v1/speak?model=aura-asteria-en', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Deepgram TTS failed: ${response.status} - ${errText}`);
+      }
+
+      const buffer = await response.arrayBuffer();
+      reply.header('Content-Type', 'audio/mpeg');
+      reply.send(Buffer.from(buffer));
+    } catch (err: any) {
+      console.error("Backend TTS Error:", err);
+      reply.status(500).send({ error: err.message || "Failed to generate speech" });
+    }
   });
 
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;

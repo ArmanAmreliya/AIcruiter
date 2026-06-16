@@ -15,6 +15,8 @@ const nextConfig = {
     NEXT_SUPABASE_ANON_KEY: process.env.NEXT_SUPABASE_ANON_KEY,
     VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL,
     VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY,
+    NEXT_AI_API_KEY: process.env.NEXT_AI_API_KEY,
+    VITE_AI_API_KEY: process.env.VITE_AI_API_KEY,
   }
 };
 

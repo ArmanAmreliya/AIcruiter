@@ -52,6 +52,10 @@ export const FETCH_JOB_BY_ID = gql`
       status
       candidateCount
       createdAt
+      durationMinutes
+      user {
+        companyName
+      }
     }
   }
 `;
