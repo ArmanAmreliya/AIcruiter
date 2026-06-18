@@ -13,11 +13,23 @@ import {
 import { User, Job, Activity, DashboardStats } from '../types';
 import { toast } from 'sonner';
 
+const DEFAULT_USER: User = {
+  id: '',
+  name: 'Loading...',
+  company: '...',
+  role: '',
+  aiCredits: 0,
+  email: '',
+  website: '',
+  notificationSettings: '{}'
+};
+
 export const useAiCruiter = () => {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
+  const [candidates, setCandidates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // 1. Fetch Data from GraphQL
@@ -95,6 +107,13 @@ export const useAiCruiter = () => {
           subtitle: a.subtitle,
           timestamp: a.timestamp,
           score: a.score
+        })));
+      }
+
+      if (data?.candidates) {
+        setCandidates(data.candidates.map((c: any) => ({
+          id: c.id,
+          createdAt: c.createdAt
         })));
       }
 
@@ -301,9 +320,10 @@ export const useAiCruiter = () => {
   };
 
   return {
-    user: user || { name: 'Loading...', company: '...', aiCredits: 0, email: '', id: '', role: '', website: '', notificationSettings: '{}' }, // Safe default
+    user: user || DEFAULT_USER,
     jobs,
     recentActivity,
+    candidates,
     stats,
     createJob,
     updateJob,

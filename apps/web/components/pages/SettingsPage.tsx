@@ -344,18 +344,22 @@ export const SettingsPage = () => {
 
     // Sync state with loaded user values
     useEffect(() => {
-        if (user) {
-            setFullName(user.name || '');
-            setRole(user.role || '');
-            setCompanyName(user.company || '');
-            setWebsite(user.website || '');
+        if (user && user.id) {
+            setFullName(prev => prev === user.name ? prev : (user.name || ''));
+            setRole(prev => prev === user.role ? prev : (user.role || ''));
+            setCompanyName(prev => prev === user.company ? prev : (user.company || ''));
+            setWebsite(prev => prev === user.website ? prev : (user.website || ''));
             if (user.notificationSettings) {
                 try {
                     const parsed = JSON.parse(user.notificationSettings);
-                    setNotificationSettings(prev => ({
-                        ...prev,
-                        ...parsed
-                    }));
+                    setNotificationSettings(prev => {
+                        const keys = Object.keys(parsed) as Array<keyof typeof prev>;
+                        const changed = keys.some(k => prev[k] !== parsed[k]);
+                        if (changed) {
+                            return { ...prev, ...parsed };
+                        }
+                        return prev;
+                    });
                 } catch (e) {
                     console.error("Failed to parse notification settings:", e);
                 }

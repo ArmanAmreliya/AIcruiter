@@ -14,22 +14,7 @@ import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const data7d = [
-  { name: 'Mon', value: 45 },
-  { name: 'Tue', value: 60 },
-  { name: 'Wed', value: 75 },
-  { name: 'Thu', value: 50 },
-  { name: 'Fri', value: 90 },
-  { name: 'Sat', value: 65 },
-  { name: 'Sun', value: 80 },
-];
 
-const data30d = [
-  { name: 'Week 1', value: 320 },
-  { name: 'Week 2', value: 450 },
-  { name: 'Week 3', value: 400 },
-  { name: 'Week 4', value: 580 },
-];
 
 const CustomTooltip = ({ active, payload, label, theme }: any) => {
   if (active && payload && payload.length) {
@@ -53,12 +38,81 @@ const CustomTooltip = ({ active, payload, label, theme }: any) => {
   return null;
 };
 
-export const VolumeChart = () => {
+export const VolumeChart = ({ candidates = [] }: { candidates?: any[] }) => {
   const { theme } = useTheme();
   const [timeRange, setTimeRange] = useState<'7d' | '30d'>('7d');
   const [showMenu, setShowMenu] = useState(false);
 
-  const data = timeRange === '7d' ? data7d : data30d;
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 300 });
+
+  React.useEffect(() => {
+    if (!containerRef.current) return;
+
+    const updateSize = () => {
+      if (containerRef.current) {
+        setDimensions({
+          width: containerRef.current.clientWidth || 500,
+          height: 300
+        });
+      }
+    };
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateSize();
+    });
+    
+    resizeObserver.observe(containerRef.current);
+    updateSize(); // Set initial dimensions
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  const get7DaysData = () => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const data = [];
+    const now = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      const dayName = days[d.getDay()];
+      
+      const count = candidates.filter(c => {
+        const cDate = new Date(c.createdAt);
+        return cDate.toDateString() === d.toDateString();
+      }).length;
+      
+      data.push({ name: dayName, value: count });
+    }
+    
+    return data;
+  };
+
+  const get30DaysData = () => {
+    const data = [];
+    const now = new Date();
+    
+    for (let i = 3; i >= 0; i--) {
+      const start = new Date();
+      start.setDate(now.getDate() - (i + 1) * 7);
+      const end = new Date();
+      end.setDate(now.getDate() - i * 7);
+      
+      const count = candidates.filter(c => {
+        const cDate = new Date(c.createdAt);
+        return cDate >= start && cDate < end;
+      }).length;
+      
+      data.push({ name: `Week ${4 - i}`, value: count });
+    }
+    
+    return data;
+  };
+
+  const data = timeRange === '7d' ? get7DaysData() : get30DaysData();
 
   return (
     <div className={cn(
@@ -121,9 +175,11 @@ export const VolumeChart = () => {
         </div>
       </div>
 
-      <div className="flex-1 w-full h-[300px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+      <div ref={containerRef} className="w-full h-[300px] relative flex items-center justify-center">
+        {dimensions.width === 0 ? (
+          <div className="w-8 h-8 rounded-full border-4 border-purple-500 border-t-transparent animate-spin" />
+        ) : (
+          <AreaChart data={data} width={dimensions.width} height={dimensions.height} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="colorPurple" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#6D28D9" stopOpacity={0.3} />
@@ -161,7 +217,7 @@ export const VolumeChart = () => {
               animationDuration={2000}
             />
           </AreaChart>
-        </ResponsiveContainer>
+        )}
       </div>
     </div>
   );

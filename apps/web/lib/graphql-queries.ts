@@ -28,6 +28,10 @@ export const GET_DASHBOARD_DATA = gql`
       timestamp
       score
     }
+    candidates {
+      id
+      createdAt
+    }
   }
 `;
 

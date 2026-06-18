@@ -19,7 +19,7 @@ interface DashboardClientProps {
 
 export const DashboardClient = ({ onNavigateCreateJob }: DashboardClientProps) => {
   const { theme } = useTheme();
-  const { user, jobs, recentActivity, stats, loading } = useAiCruiter();
+  const { user, jobs, recentActivity, stats, loading, candidates } = useAiCruiter();
   const navigate = useNavigate();
 
   if (loading) {
@@ -127,7 +127,7 @@ export const DashboardClient = ({ onNavigateCreateJob }: DashboardClientProps) =
           transition={{ delay: 0.2 }}
           className="lg:col-span-2"
         >
-          <VolumeChart />
+          <VolumeChart candidates={candidates} />
         </motion.div>
 
         {/* Live Feed Sidebar */}
