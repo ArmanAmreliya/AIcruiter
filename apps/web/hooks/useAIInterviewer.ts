@@ -302,8 +302,8 @@ ${description}
             if (!token) throw new Error("Could not fetch Deepgram token");
             logTrace("Deepgram token obtained successfully from server resolver.");
 
-            // B. Connect directly to Deepgram WebSocket via native browser API with sub-protocol auth (endpointing=500 for low latency)
-            const wsUrl = `wss://api.deepgram.com/v1/listen?model=nova-2&interim_results=true&smart_format=true&filler_words=true&endpointing=1000`;
+            // B. Connect directly to Deepgram WebSocket via native browser API with sub-protocol auth (endpointing=2000 for conversational comfort)
+            const wsUrl = `wss://api.deepgram.com/v1/listen?model=nova-2&interim_results=true&smart_format=true&filler_words=true&endpointing=2000`;
             logTrace(`Establishing direct WebSocket to Deepgram: wss://api.deepgram.com/v1/listen...`);
             const ws = new WebSocket(wsUrl, ['token', token]);
             deepgramLiveRef.current = ws;
@@ -348,11 +348,11 @@ ${description}
                             silenceTimerRef.current = setTimeout(() => {
                                 const fallbackUtterance = accumulatedTranscriptRef.current.trim();
                                 if (fallbackUtterance) {
-                                    logTrace(`Fallback silence timer expired (2500ms). Submitting: "${fallbackUtterance}"`);
+                                    logTrace(`Fallback silence timer expired (3000ms). Submitting: "${fallbackUtterance}"`);
                                     accumulatedTranscriptRef.current = '';
                                     generateResponse(fallbackUtterance);
                                 }
-                                }, 2500);
+                                }, 3000);
                         } else {
                             // Show accumulated finalized text plus current interim text for live responsive subtitle feel
                             const interimDisplay = accumulatedTranscriptRef.current 

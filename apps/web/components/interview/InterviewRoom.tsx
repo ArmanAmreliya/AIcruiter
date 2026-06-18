@@ -13,7 +13,11 @@ export const InterviewRoom = () => {
     const { jobId } = useParams<{ jobId: string }>();
     const location = useLocation();
     const navigate = useNavigate();
-    const { theme, toggleTheme } = useTheme();
+    const { theme, toggleTheme, setTheme } = useTheme();
+
+    useEffect(() => {
+        setTheme('light');
+    }, [setTheme]);
 
     // Keep the first render deterministic for SSR, then hydrate from route state/sessionStorage on mount.
     const [candidateId, setCandidateId] = useState('guest');
@@ -297,9 +301,9 @@ export const InterviewRoom = () => {
             </div>
 
             {/* Main Container */}
-            <div className="relative flex-1 overflow-hidden p-4 md:p-6">
-                <div className="flex h-full min-h-0 flex-col gap-4 md:gap-6">
-                    <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+            <div className="relative flex-1 overflow-y-auto p-4 md:p-6">
+                <div className="flex flex-col gap-4 md:gap-6 min-h-full">
+                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
 
                 {/* Left: AI Avatar Section */}
                 <div className={cn(
@@ -467,84 +471,84 @@ export const InterviewRoom = () => {
                         </div>
                     </div>
                     </div>
+                </div>
 
-                    {/* Bottom: Transcript Component */}
+                {/* Bottom: Transcript Component */}
+                <div className={cn(
+                    "rounded-3xl border p-3 md:p-4 py-2.5 md:py-3",
+                    theme === 'light'
+                        ? "bg-white border-slate-200/80 shadow-md shadow-slate-100"
+                        : "bg-black/40 border-white/5"
+                )}>
+                <div className="flex items-center justify-between gap-3 pb-3 mb-4 border-b border-white/5">
+                    <div className="flex items-center gap-2 text-purple-500 dark:text-purple-300">
+                        <div className="h-2.5 w-2.5 rounded-full bg-purple-500" />
+                        <span className="text-xs font-bold tracking-wider uppercase">Transcript</span>
+                    </div>
                     <div className={cn(
-                        "min-h-0 rounded-3xl border p-4 md:p-5",
-                        theme === 'light'
-                            ? "bg-white border-slate-200/80 shadow-md shadow-slate-100"
-                            : "bg-black/40 border-white/5"
+                        "text-[10px] font-bold uppercase tracking-widest",
+                        status === 'LISTENING'
+                            ? "text-green-500"
+                            : status === 'SPEAKING'
+                                ? "text-purple-500"
+                                : "text-amber-500"
                     )}>
-                    <div className="flex items-center justify-between gap-3 pb-3 mb-4 border-b border-white/5">
-                        <div className="flex items-center gap-2 text-purple-500 dark:text-purple-300">
-                            <div className="h-2.5 w-2.5 rounded-full bg-purple-500" />
-                            <span className="text-xs font-bold tracking-wider uppercase">Transcript</span>
-                        </div>
-                        <div className={cn(
-                            "text-[10px] font-bold uppercase tracking-widest",
-                            status === 'LISTENING'
-                                ? "text-green-500"
-                                : status === 'SPEAKING'
-                                    ? "text-purple-500"
-                                    : "text-amber-500"
-                        )}>
-                            {status.toLowerCase()}
-                        </div>
+                        {status.toLowerCase()}
                     </div>
+                </div>
 
-                    {status === 'LISTENING' && transcript && (
-                        <div className={cn(
-                            "mb-3 flex items-start justify-between gap-3 rounded-2xl border px-4 py-3 text-xs transition-colors duration-500",
-                            theme === 'light'
-                                ? "border-purple-100 bg-purple-50 text-purple-900"
-                                : "border-purple-500/10 bg-purple-500/10 text-purple-100"
-                        )}>
-                            <div className="min-w-0 flex-1">
-                                <div className={cn(
-                                    "mb-1 text-[10px] font-bold uppercase tracking-widest",
-                                    theme === 'light' ? "text-purple-600" : "text-purple-300"
-                                )}>Listening</div>
-                                <p className="leading-relaxed line-clamp-2">{transcript}</p>
-                            </div>
+                {status === 'LISTENING' && transcript && (
+                    <div className={cn(
+                        "mb-3 flex items-start justify-between gap-3 rounded-2xl border px-4 py-3 text-xs transition-colors duration-500",
+                        theme === 'light'
+                            ? "border-purple-100 bg-purple-50 text-purple-900"
+                            : "border-purple-500/10 bg-purple-500/10 text-purple-100"
+                    )}>
+                        <div className="min-w-0 flex-1">
                             <div className={cn(
-                                "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest",
-                                theme === 'light' ? "bg-white text-purple-600" : "bg-black/20 text-purple-200"
-                            )}>
-                                You
-                            </div>
+                                "mb-1 text-[10px] font-bold uppercase tracking-widest",
+                                theme === 'light' ? "text-purple-600" : "text-purple-300"
+                            )}>Listening</div>
+                            <p className="leading-relaxed line-clamp-2">{transcript}</p>
                         </div>
-                    )}
+                        <div className={cn(
+                            "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest",
+                            theme === 'light' ? "bg-white text-purple-600" : "bg-black/20 text-purple-200"
+                        )}>
+                            You
+                        </div>
+                    </div>
+                )}
 
-                    <div className="max-h-[28vh] overflow-y-auto space-y-3 pr-2 scrollbar-thin flex flex-col md:max-h-[34vh] lg:max-h-[40vh]">
-                        {history.length === 0 ? (
-                            <p className="py-8 text-sm italic text-center text-gray-400">No conversation started. Click "Start Interview" to begin.</p>
-                        ) : (
-                            history.map((msg, index) => (
-                                <div
-                                    key={`${msg.role}-${index}-${msg.content.slice(0, 24)}`}
-                                    className={cn(
-                                        "max-w-[85%] rounded-2xl p-3 text-xs flex flex-col",
-                                        msg.role === 'assistant'
-                                            ? theme === 'light'
-                                                ? "bg-purple-50 text-purple-900 border border-purple-100 self-start"
-                                                : "bg-purple-950/20 text-purple-200 border border-purple-500/10 self-start"
-                                            : theme === 'light'
-                                                ? "bg-slate-100 text-slate-800 border border-slate-200 self-end ml-auto"
-                                                : "bg-zinc-800 text-zinc-100 border border-white/5 self-end ml-auto"
-                                    )}
-                                >
-                                    <span className="mb-0.5 font-bold opacity-65">
-                                        {msg.role === 'assistant' ? 'Sarah (AI Recruiter)' : 'You'}
-                                    </span>
-                                    <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                    </div>
+                <div className="max-h-[160px] overflow-y-auto space-y-2.5 pr-2 scrollbar-thin flex flex-col md:max-h-[200px] lg:max-h-[240px]">
+                    {history.length === 0 ? (
+                        <p className="py-8 text-sm italic text-center text-gray-400">No conversation started. Click "Start Interview" to begin.</p>
+                    ) : (
+                        history.map((msg, index) => (
+                            <div
+                                key={`${msg.role}-${index}-${msg.content.slice(0, 24)}`}
+                                className={cn(
+                                    "max-w-[85%] rounded-2xl p-3 text-xs flex flex-col",
+                                    msg.role === 'assistant'
+                                        ? theme === 'light'
+                                            ? "bg-purple-50 text-purple-900 border border-purple-100 self-start"
+                                            : "bg-purple-950/20 text-purple-200 border border-purple-500/10 self-start"
+                                        : theme === 'light'
+                                            ? "bg-slate-100 text-slate-800 border border-slate-200 self-end ml-auto"
+                                            : "bg-zinc-800 text-zinc-100 border border-white/5 self-end ml-auto"
+                                )}
+                            >
+                                <span className="mb-0.5 font-bold opacity-65">
+                                    {msg.role === 'assistant' ? 'Sarah (AI Recruiter)' : 'You'}
+                                </span>
+                                <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                            </div>
+                        ))
+                    )}
+                </div>
                 </div>
             </div>
         </div>
-        </div>
+    </div>
     );
 };

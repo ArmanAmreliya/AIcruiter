@@ -4,14 +4,16 @@ import React, { useState, useEffect, ReactNode, useContext } from 'react';
 const ThemeContext = React.createContext({
   theme: 'light',
   toggleTheme: () => {},
+  setTheme: (theme: string) => {},
 });
 
 export const ThemeProvider = ({ children }: { children?: ReactNode }) => {
   const [theme, setTheme] = useState('light');
 
   useEffect(() => {
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark');
+    const storedTheme = typeof window !== 'undefined' ? localStorage.getItem('theme') : null;
+    if (storedTheme === 'dark' || storedTheme === 'light') {
+      setTheme(storedTheme);
     }
   }, []);
 
@@ -19,6 +21,9 @@ export const ThemeProvider = ({ children }: { children?: ReactNode }) => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('theme', theme);
+    }
   }, [theme]);
 
   const toggleTheme = () => {
@@ -26,7 +31,7 @@ export const ThemeProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );

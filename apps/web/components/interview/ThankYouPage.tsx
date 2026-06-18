@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Star, MessageSquare, ArrowRight, Heart, Home } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -12,7 +12,11 @@ import { UPDATE_CANDIDATE_INTERVIEW_STATUS } from '../../lib/graphql-queries';
 export const ThankYouPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { theme } = useTheme();
+    const { theme, setTheme } = useTheme();
+
+    useEffect(() => {
+        setTheme('light');
+    }, [setTheme]);
     const [rating, setRating] = useState(0);
     const [feedback, setFeedback] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);

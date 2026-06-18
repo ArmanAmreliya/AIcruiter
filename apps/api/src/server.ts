@@ -314,6 +314,21 @@ const resolvers = {
       });
     },
     createCandidate: async (_parent: any, args: { jobId: string; name: string; email: string }) => {
+      const existingCandidate = await prisma.candidate.findFirst({
+        where: {
+          jobId: args.jobId,
+          email: args.email,
+        }
+      });
+
+      if (existingCandidate) {
+        if (existingCandidate.status === 'COMPLETED') {
+          throw new Error("ALREADY_COMPLETED");
+        }
+        // If they registered but haven't finished, let them resume the same record.
+        return existingCandidate;
+      }
+
       return prisma.candidate.create({
         data: {
           jobId: args.jobId,
