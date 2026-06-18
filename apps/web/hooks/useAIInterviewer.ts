@@ -29,12 +29,18 @@ export const useAIInterviewer = (
     const [transcript, setTranscript] = useState('');
     const [aiResponse, setAiResponse] = useState('');
     const [history, setHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
+    const [logs, setLogs] = useState<string[]>([]);
 
     const contextRef = useRef({ jobTitle, companyName, jobDescription, candidateName });
+    const historyRef = useRef<{ role: 'user' | 'assistant', content: string }[]>([]);
 
     useEffect(() => {
         contextRef.current = { jobTitle, companyName, jobDescription, candidateName };
     }, [jobTitle, companyName, jobDescription, candidateName]);
+
+    useEffect(() => {
+        historyRef.current = history;
+    }, [history]);
 
     // Refs for persistent objects
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -44,33 +50,51 @@ export const useAIInterviewer = (
     const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
     const accumulatedTranscriptRef = useRef('');
     const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+    const keepAliveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Logging helper with timestamping
+    const logTrace = (msg: string) => {
+        const timestamp = new Date().toLocaleTimeString();
+        const fullMsg = `[${timestamp}] ${msg}`;
+        console.log(`[useAIInterviewer] ${msg}`);
+        setLogs(prev => [...prev, fullMsg]);
+    };
 
     // Initialize AI API key dynamically using environment helper
     useEffect(() => {
-        const apiKey = getEnv('NEXT_AI_API_KEY') || getEnv('VITE_AI_API_KEY');
+        logTrace("Initializing AI Brain components...");
+        const apiKey =
+            getEnv('NEXT_GROQ_API_KEY') ||
+            getEnv('VITE_GROQ_API_KEY') ||
+            getEnv('GROQ_API_KEY') ||
+            getEnv('NEXT_AI_API_KEY') ||
+            getEnv('VITE_AI_API_KEY');
         if (apiKey) {
             aiApiKeyRef.current = apiKey;
+            logTrace(`Groq API key loaded successfully (Prefix: ${apiKey.substring(0, 4)}..., Length: ${apiKey.length})`);
         } else {
-            console.error("NEXT_AI_API_KEY could not be initialized on client-side");
+            console.error("Groq API key could not be initialized on client-side");
+            logTrace("ERROR: Groq API key could not be loaded from client environment. Brain connection will fail.");
         }
     }, []);
 
-    // (Deprecated Web Audio API in favor of HTML5 Audio)
-
-    // --- 2. Brain: OpenRouter LLM ---
+    // --- 2. Brain: Groq LLM ---
     const generateResponse = async (userText: string) => {
         if (!aiApiKeyRef.current) {
-            console.error("AI API key not initialized - NEXT_AI_API_KEY may be missing!");
+            logTrace("ERROR: Cannot generate response. Groq API Key is not configured.");
             toast.error("AI Interviewer brain service is not configured. Please contact support.");
             setStatus('LISTENING');
             return;
         }
 
         setStatus('THINKING');
+        logTrace(`Stored candidate response: "${userText}"`);
 
         const { jobTitle: title, companyName: company, jobDescription: description, candidateName: candidate } = contextRef.current;
-        const systemPrompt = `You are Sarah, a warm and professional talent recruiter at ${company}.
-You are interviewing the candidate (${candidate}) for the position of ${title}.
+        logTrace(`Preparing Groq LLM context for candidate "${candidate}" matching role "${title}" at "${company}"`);
+        
+        const systemPrompt = `You are Sarah, a calm, warm, friendly, and highly professional female recruiter at ${company}.
+    You are interviewing the candidate (${candidate}) for the position of ${title}.
 
 Here is the Job Description for this position:
 """
@@ -78,32 +102,38 @@ ${description}
 """
 
 **Your Task:**
-1. Screen the candidate specifically for the skills, requirements, and responsibilities detailed in the Job Description above.
-2. Ask ONE question at a time. Probe their actual experience, and follow up on their answers to assess depth of knowledge.
-3. Be conversational and professional.
+1. Start the interview with a brief candidate introduction first, then move into the questions. Do not give a long introduction or ask for permission to begin.
+2. Begin with fundamentals, then move to medium-difficulty questions, and finish with hard questions.
+3. Screen the candidate specifically for the skills, requirements, and responsibilities detailed in the Job Description above.
+4. Ask ONE question at a time.
+5. After each candidate answer, ask a thoughtful follow-up based on what they actually said.
+6. Probe for depth with gentle but targeted follow-ups like implementation details, tradeoffs, edge cases, ownership, and outcomes.
+7. Keep the flow structured and adaptive: if a candidate answers strongly, raise difficulty; if they struggle, stay one level deeper on fundamentals before moving up.
+8. Maintain a supportive tone that feels encouraging, attentive, and professional.
 
 **Speaking Style:**
-* Speak casually, warmly, and naturally. Use short sentences and contractions (e.g. "I'm", "Let's").
+* Speak directly, clearly, and naturally. Use short sentences and contractions (e.g. "I'm", "Let's").
+* Sound calm, confident, and encouraging, like a thoughtful recruiter guiding a strong conversation.
 * Use conversational fillers occasionally (e.g. "Hmm, I see", "Interesting", "That makes sense") to show active listening.
 * Avoid robotic phrasing or giving long monologues.`;
 
         const messages = [
             { role: 'system' as const, content: systemPrompt },
-            ...history,
+            ...historyRef.current,
             { role: 'user' as const, content: userText }
         ];
 
+        const startTime = Date.now();
         try {
-            let response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            logTrace("Sending prompt to Groq API (model: llama-3.3-70b-versatile)...");
+            let response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${aiApiKeyRef.current}`,
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://aicruiter.com",
-                    "X-Title": "AIcruiter",
+                    "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    model: "meta-llama/llama-3.3-70b-instruct:free",
+                    model: "llama-3.3-70b-versatile",
                     messages,
                     temperature: 0.7,
                     max_tokens: 150,
@@ -111,17 +141,15 @@ ${description}
             });
 
             if (response.status === 429) {
-                console.warn("Llama 3.3 70B rate limited. Retrying with Llama 3.2 3B free...");
-                response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                logTrace("WARNING: Llama 3.3 70B rate limited. Retrying with Llama 3.1 8B instant...");
+                response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                     method: "POST",
                     headers: {
                         "Authorization": `Bearer ${aiApiKeyRef.current}`,
-                        "Content-Type": "application/json",
-                        "HTTP-Referer": "https://aicruiter.com",
-                        "X-Title": "AIcruiter",
+                        "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        model: "meta-llama/llama-3.2-3b-instruct:free",
+                        model: "llama-3.1-8b-instant",
                         messages,
                         temperature: 0.7,
                         max_tokens: 150,
@@ -131,22 +159,33 @@ ${description}
 
             if (!response.ok) {
                 const errText = await response.text();
-                throw new Error(`OpenRouter API error: ${response.status} - ${errText}`);
+                throw new Error(`Groq API error: ${response.status} - ${errText}`);
             }
 
             const data = await response.json();
             const responseText = data.choices?.[0]?.message?.content || "";
+            const duration = Date.now() - startTime;
+            logTrace(`Groq response generated successfully in ${duration}ms: "${responseText.substring(0, 60)}..."`);
 
             setAiResponse(responseText);
-            setHistory(prev => [...prev, { role: 'user', content: userText }, { role: 'assistant', content: responseText }]);
+
+            // Keep the in-memory dialogue history in sync for the next turn.
+            const nextHistory: { role: 'user' | 'assistant', content: string }[] = [
+                ...historyRef.current,
+                { role: 'user' as const, content: userText },
+                { role: 'assistant' as const, content: responseText }
+            ];
+            historyRef.current = nextHistory;
+            setHistory(nextHistory);
 
             // Save to Supabase
+            logTrace("Saving dialogue exchange to database (InterviewTranscript)...");
             saveTranscript(userText, responseText);
 
             // Speak it
             speak(responseText);
-        } catch (error) {
-            console.error("OpenRouter Error:", error);
+        } catch (error: any) {
+            logTrace(`ERROR generating AI response: ${error.message || error}`);
             toast.error("Error communicating with AI recruiter brain.");
             setStatus('LISTENING');
         }
@@ -156,6 +195,16 @@ ${description}
     const speak = async (text: string) => {
         setStatus('SPEAKING');
         isSpeakingRef.current = true;
+        const mediaRecorder = mediaRecorderRef.current;
+        const recorderWasActive = mediaRecorder?.state === 'recording';
+        if (recorderWasActive && mediaRecorder) {
+            try {
+                mediaRecorder.pause();
+                logTrace("Pausing mic capture while Sarah is speaking to prevent self-echo in Deepgram.");
+            } catch (e) {
+                logTrace("WARNING: Could not pause MediaRecorder before TTS playback.");
+            }
+        }
 
         try {
             const defaultUrl = 'http://localhost:4000';
@@ -170,6 +219,7 @@ ${description}
                 apiUrl = process.env.NEXT_PUBLIC_API_URL.replace('/graphql', '');
             }
 
+            logTrace(`Requesting TTS from local proxy: ${apiUrl}/api/speak`);
             const response = await fetch(`${apiUrl}/api/speak`, {
                 method: 'POST',
                 headers: {
@@ -178,10 +228,11 @@ ${description}
                 body: JSON.stringify({ text })
             });
 
-            if (!response.ok) throw new Error("TTS Failed");
+            if (!response.ok) throw new Error(`TTS service returned status ${response.status}`);
 
             const audioBlob = await response.blob();
             const audioUrl = URL.createObjectURL(audioBlob);
+            logTrace(`TTS audio payload downloaded (Size: ${audioBlob.size} bytes)`);
 
             if (activeAudioRef.current) {
                 try {
@@ -193,36 +244,55 @@ ${description}
             activeAudioRef.current = audio;
 
             audio.onended = () => {
+                logTrace("AI Audio speech track completed. Reverting to LISTENING status.");
                 if (activeAudioRef.current === audio) {
                     activeAudioRef.current = null;
                 }
                 isSpeakingRef.current = false;
+                if (recorderWasActive && mediaRecorder) {
+                    try {
+                        mediaRecorder.resume();
+                        logTrace("Resumed mic capture after Sarah finished speaking.");
+                    } catch (e) {
+                        logTrace("WARNING: Could not resume MediaRecorder after TTS playback.");
+                    }
+                }
                 setStatus('LISTENING');
             };
 
             await audio.play();
+            logTrace("Audio playback started");
 
-        } catch (error) {
-            console.error("TTS Error:", error);
+        } catch (error: any) {
+            logTrace(`ERROR in TTS generation or playback: ${error.message || error}`);
+            if (recorderWasActive && mediaRecorder) {
+                try {
+                    mediaRecorder.resume();
+                } catch (e) {}
+            }
             setStatus('LISTENING');
+            isSpeakingRef.current = false;
         }
     };
 
     const saveTranscript = async (question: string, answer: string) => {
         try {
-            await supabase.from('InterviewTranscript').insert({
+            const { error } = await supabase.from('InterviewTranscript').insert({
                 jobId: jobId,
                 candidateId: candidateId,
                 userText: question,
                 aiText: answer
             });
-        } catch (error) {
-            console.error("Failed to save transcript:", error);
+            if (error) throw error;
+            logTrace("Supabase dialogue transcript saved successfully");
+        } catch (error: any) {
+            logTrace(`WARNING: Failed to save dialogue to Supabase: ${error.message || error}`);
         }
     };
 
     // --- 4. Ears: Deepgram Nova-2 STT via Browser WebSocket & Temp Token ---
     const startListening = async (userStream?: MediaStream) => {
+        logTrace("Initial startInterview invoked. Generating Deepgram credential token...");
         try {
             // A. Get a short-lived Deepgram token from backend
             const { data } = await apolloClient.mutate<any>({
@@ -230,40 +300,46 @@ ${description}
             });
             const token = data?.getDeepgramToken;
             if (!token) throw new Error("Could not fetch Deepgram token");
+            logTrace("Deepgram token obtained successfully from server resolver.");
 
             // B. Connect directly to Deepgram WebSocket via native browser API with sub-protocol auth (endpointing=500 for low latency)
-            const wsUrl = `wss://api.deepgram.com/v1/listen?model=nova-2&interim_results=true&smart_format=true&filler_words=true&endpointing=500`;
+            const wsUrl = `wss://api.deepgram.com/v1/listen?model=nova-2&interim_results=true&smart_format=true&filler_words=true&endpointing=1000`;
+            logTrace(`Establishing direct WebSocket to Deepgram: wss://api.deepgram.com/v1/listen...`);
             const ws = new WebSocket(wsUrl, ['token', token]);
             deepgramLiveRef.current = ws;
 
             ws.onopen = () => {
-                console.log("Deepgram STT WebSocket Connected");
+                logTrace("Deepgram STT WebSocket connected successfully.");
                 setStatus('LISTENING');
+
+                // Start KeepAlive heartbeat interval every 5 seconds to prevent Deepgram silent timeout
+                logTrace("Initializing 5s KeepAlive WebSocket heartbeat interval.");
+                if (keepAliveTimerRef.current) clearInterval(keepAliveTimerRef.current);
+                keepAliveTimerRef.current = setInterval(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'KeepAlive' }));
+                        logTrace("STT KeepAlive heartbeat sent.");
+                    }
+                }, 5000);
             };
 
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
+                    
+                    // Filter out keepalive return messages
+                    if (data.type === 'KeepAlive') return;
+
                     const alternative = data.channel?.alternatives?.[0];
                     const segmentText = alternative?.transcript || '';
 
                     if (segmentText) {
-                        // Interrupt logic: If user starts speaking while AI is talking, stop playback
                         if (isSpeakingRef.current) {
-                            if (activeAudioRef.current) {
-                                try {
-                                    activeAudioRef.current.pause();
-                                } catch (e) {
-                                    // Ignore if already paused
-                                }
-                                activeAudioRef.current = null;
-                            }
-                            isSpeakingRef.current = false;
-                            setStatus('LISTENING');
+                            logTrace("Ignoring assistant audio bleed while Sarah is speaking.");
+                            return;
                         }
 
                         if (data.is_final) {
-                            // Append to our accumulated transcript for this speech turn to avoid truncation
                             accumulatedTranscriptRef.current += (accumulatedTranscriptRef.current ? ' ' : '') + segmentText;
                             setTranscript(accumulatedTranscriptRef.current);
 
@@ -272,11 +348,11 @@ ${description}
                             silenceTimerRef.current = setTimeout(() => {
                                 const fallbackUtterance = accumulatedTranscriptRef.current.trim();
                                 if (fallbackUtterance) {
-                                    console.log("Fallback silence timer triggered with:", fallbackUtterance);
+                                    logTrace(`Fallback silence timer expired (2500ms). Submitting: "${fallbackUtterance}"`);
                                     accumulatedTranscriptRef.current = '';
                                     generateResponse(fallbackUtterance);
                                 }
-                            }, 1500);
+                                }, 2500);
                         } else {
                             // Show accumulated finalized text plus current interim text for live responsive subtitle feel
                             const interimDisplay = accumulatedTranscriptRef.current 
@@ -291,27 +367,36 @@ ${description}
                         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
                         const finalUtterance = accumulatedTranscriptRef.current.trim();
                         if (finalUtterance) {
-                            console.log("Speech final detected, triggering LLM with:", finalUtterance);
+                            logTrace(`Natural speech final event received. Submitting candidate input: "${finalUtterance}"`);
                             accumulatedTranscriptRef.current = '';
                             generateResponse(finalUtterance);
                         }
                     }
-                } catch (e) {
-                    console.error("Error parsing STT message:", e);
+                } catch (e: any) {
+                    logTrace(`ERROR parsing WebSocket stream text: ${e.message || e}`);
                 }
             };
 
             ws.onerror = (error) => {
-                console.error("Deepgram STT WebSocket Error:", error);
+                logTrace("ERROR: Deepgram STT WebSocket connection encountered an error.");
+                if (keepAliveTimerRef.current) {
+                    clearInterval(keepAliveTimerRef.current);
+                    keepAliveTimerRef.current = null;
+                }
             };
 
-            ws.onclose = () => {
-                console.log("Deepgram STT WebSocket Closed");
+            ws.onclose = (event) => {
+                logTrace(`Deepgram STT WebSocket closed. Code: ${event.code}, Reason: ${event.reason || 'None provided'}`);
+                if (keepAliveTimerRef.current) {
+                    clearInterval(keepAliveTimerRef.current);
+                    keepAliveTimerRef.current = null;
+                }
             };
 
             accumulatedTranscriptRef.current = '';
 
             // Use the passed in userStream if available; otherwise capture audio cross-browser compatible fallback options
+            logTrace("Requesting microphone device tracks...");
             let stream = userStream;
             if (!stream) {
                 stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -320,8 +405,9 @@ ${description}
             // Extract audio tracks only so MediaRecorder does not try to record video
             const audioTracks = stream.getAudioTracks();
             if (audioTracks.length === 0) {
-                throw new Error("No audio tracks found in stream");
+                throw new Error("No active audio tracks found in capture stream");
             }
+            logTrace(`Active mic track: "${audioTracks[0].label}"`);
             const audioStream = new MediaStream(audioTracks);
             
             let options: MediaRecorderOptions = {};
@@ -335,6 +421,7 @@ ${description}
                 }
             }
             
+            logTrace(`Initializing MediaRecorder with container mimeType: "${options.mimeType || 'default'}"`);
             const mediaRecorder = new MediaRecorder(audioStream, options);
             mediaRecorderRef.current = mediaRecorder;
 
@@ -344,25 +431,37 @@ ${description}
                 }
             };
 
+            mediaRecorder.onerror = (e: any) => {
+                logTrace(`ERROR in MediaRecorder instance: ${e.message || e}`);
+            };
+
             mediaRecorder.start(250); // Send chunks every 250ms
+            logTrace("MediaRecorder started capture cycle (250ms audio chunk slices).");
 
             // Initial Greet
             const { jobTitle: title, companyName: company, candidateName: candidate } = contextRef.current;
-            if (history.length === 0) {
+            if (historyRef.current.length === 0) {
                 const greetMsg = `Hi ${candidate}, thanks for joining. I'm Sarah, a recruiter here at ${company}. Shall we start the interview for the ${title} position?`;
+                logTrace("Triggering Sarah's initial greeting message.");
                 speak(greetMsg);
-                setHistory([{ role: 'assistant', content: greetMsg }]);
+                historyRef.current = [{ role: 'assistant', content: greetMsg }];
+                setHistory(historyRef.current);
             }
         } catch (err: any) {
-            console.error('STT setup error:', err);
+            logTrace(`ERROR during STT capture pipeline setup: ${err.message || err}`);
             toast.error('Could not connect to voice service. Please try again.');
         }
     };
 
     useEffect(() => {
         return () => {
+            logTrace("Tearing down useAIInterviewer instance...");
             if (deepgramLiveRef.current && deepgramLiveRef.current.readyState === WebSocket.OPEN) {
                 deepgramLiveRef.current.close();
+            }
+            if (keepAliveTimerRef.current) {
+                clearInterval(keepAliveTimerRef.current);
+                keepAliveTimerRef.current = null;
             }
             if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
                 mediaRecorderRef.current.stop();
@@ -374,16 +473,35 @@ ${description}
         };
     }, []);
 
+    // Expose hooks for testing
+    if (typeof window !== 'undefined') {
+        (window as any).__testAIInterviewer = {
+            status,
+            transcript,
+            aiResponse,
+            history,
+            logs,
+            setLogs,
+            generateResponse,
+            speak,
+            startListening
+        };
+    }
+
     return {
         status,
         transcript,
         aiResponse,
+        history,
+        logs,
         isEnabled: !!mediaRecorderRef.current,
         startInterview: startListening,
         toggleMic: () => {
             if (mediaRecorderRef.current?.state === 'recording') {
+                logTrace("Muting user microphone track (pausing MediaRecorder).");
                 mediaRecorderRef.current.pause();
             } else {
+                logTrace("Resuming user microphone track (resuming MediaRecorder).");
                 mediaRecorderRef.current?.resume();
             }
         }

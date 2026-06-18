@@ -447,6 +447,76 @@ const startServer = async () => {
     }
   });
 
+  fastify.post('/api/connect', async (request, reply) => {
+    const dailyApiKey = process.env.DAILY_API_KEY;
+    if (!dailyApiKey) {
+      console.warn("DAILY_API_KEY not configured. Returning mock/dev room URL.");
+      return {
+        room_url: process.env.DAILY_ROOM_URL || "https://demo.daily.co/aicruiter-dev-room",
+        token: "mock-token-123"
+      };
+    }
+
+    try {
+      // 1. Create a temporary Daily.co room
+      const roomRes = await fetch('https://api.daily.co/v1/rooms', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${dailyApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          properties: {
+            exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour expiry
+          }
+        })
+      });
+
+      if (!roomRes.ok) {
+        const err = await roomRes.text();
+        throw new Error(`Failed to create Daily room: ${roomRes.status} - ${err}`);
+      }
+
+      const roomData = await roomRes.json() as any;
+      const roomUrl = roomData.url;
+      const roomName = roomData.name;
+
+      // 2. Create a meeting token for the client participant
+      const tokenRes = await fetch('https://api.daily.co/v1/meeting-tokens', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${dailyApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          properties: {
+            room_name: roomName,
+            is_owner: false,
+          }
+        })
+      });
+
+      if (!tokenRes.ok) {
+        const err = await tokenRes.text();
+        throw new Error(`Failed to create Daily token: ${tokenRes.status} - ${err}`);
+      }
+
+      const tokenData = await tokenRes.json() as any;
+      const token = tokenData.token;
+
+      return {
+        room_url: roomUrl,
+        token: token
+      };
+    } catch (err: any) {
+      console.warn("Failed to connect to Daily, falling back to mock room URL for development:", err.message || err);
+      return {
+        room_url: process.env.DAILY_ROOM_URL || "https://demo.daily.co/aicruiter-dev-room",
+        token: "mock-token-123"
+      };
+    }
+  });
+
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
   const host = process.env.HOST || '0.0.0.0';
 
