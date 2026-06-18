@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Sparkles, Loader2, ArrowRight, Check, Copy, LayoutDashboard, Clock, Tag, Briefcase, FileText } from 'lucide-react';
+import { ArrowLeft, Sparkles, Loader2, ArrowRight, Check, Copy, LayoutDashboard, Clock, Tag, Briefcase, FileText, User, Award, Brain, BookOpen, ListChecks } from 'lucide-react';
 import { useAiCruiter } from '../../hooks/use-aicruiter';
 import { useTheme } from '../../context/ThemeContext';
 import { useLocation } from 'react-router-dom';
-import { cn } from '../../lib/utils';
+import { cn, parseJobDescription, serializeJobDescription } from '../../lib/utils';
 import { toast } from 'sonner';
 
 interface CreateJobPageProps {
@@ -22,10 +22,25 @@ const INTERVIEW_TYPES = [
 
 const DURATIONS = [15, 30, 45, 60];
 
+const EXPERIENCE_LEVELS = [
+  { id: 'Entry-Level', label: 'Entry-Level', desc: 'Fundamentals, basic syntax, coding principles' },
+  { id: 'Mid-Level', label: 'Mid-Level', desc: 'Application building, design patterns, testing' },
+  { id: 'Senior', label: 'Senior', desc: 'Architecture, high scaling, complex tradeoffs' },
+  { id: 'Lead', label: 'Lead', desc: 'System design, engineering leadership, strategy' }
+];
+
+const PERSONAS = [
+  { id: 'Sarah', name: 'Sarah', role: 'Talent Acquisition', desc: 'Warm & Encouraging', tone: 'Conversational fillers, lower stress, friendly guidance' },
+  { id: 'David', name: 'David', role: 'Tech Lead Interviewer', desc: 'Technical & Rigorous', tone: 'Deep architecture questions, tradeoff analysis, testing edge cases' },
+  { id: 'Emma', name: 'Emma', role: 'Product Talent Partner', desc: 'Fast-paced & Conversational', tone: 'Collaborative agility, speed, communication, outcomes focus' }
+];
+
+const SUGGESTED_SKILLS = ['React', 'System Design', 'TypeScript', 'Node.js', 'SQL', 'Algorithms', 'Testing', 'Behavioral', 'Communication', 'AWS'];
+
 export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
   const { theme } = useTheme();
   const location = useLocation();
-  const { createJob, updateJob, fetchJobById, user } = useAiCruiter();
+  const { createJob, updateJob, fetchJobById } = useAiCruiter();
 
   // URL Params for Edit Mode
   const queryParams = new URLSearchParams(location.search);
@@ -37,6 +52,12 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
   const [description, setDescription] = useState('');
   const [duration, setDuration] = useState(15);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['Technical']);
+  
+  // Custom Interview settings
+  const [experienceLevel, setExperienceLevel] = useState('Mid-Level');
+  const [guidelines, setGuidelines] = useState('');
+  const [focusAreas, setFocusAreas] = useState('');
+  const [persona, setPersona] = useState('Sarah');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdJobId, setCreatedJobId] = useState<string | null>(null);
@@ -49,9 +70,17 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
         const job = await fetchJobById(editId);
         if (job) {
           setJobPosition(job.title);
-          setDescription(job.description);
-          setDuration(job.duration_minutes || 15);
-          setSelectedTypes(job.interview_type || ['Technical']);
+          
+          // Parse metadata out of description
+          const parsedMeta = parseJobDescription(job.description);
+          setDescription(parsedMeta.description);
+          setGuidelines(parsedMeta.guidelines);
+          setFocusAreas(parsedMeta.focusAreas);
+          setPersona(parsedMeta.persona);
+
+          setDuration(job.durationMinutes || job.duration_minutes || 15);
+          setSelectedTypes(job.interviewType || job.interview_type || ['Technical']);
+          setExperienceLevel(job.experienceLevel || 'Mid-Level');
         }
         setIsInitialLoading(false);
       };
@@ -67,6 +96,17 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
     );
   };
 
+  const handleAddSkill = (skill: string) => {
+    setFocusAreas(prev => {
+      const currentSkills = prev ? prev.split(',').map(s => s.trim()) : [];
+      if (currentSkills.includes(skill)) {
+        return currentSkills.filter(s => s !== skill).join(', ');
+      } else {
+        return [...currentSkills, skill].filter(Boolean).join(', ');
+      }
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!jobPosition || !description) {
@@ -78,20 +118,28 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
       return;
     }
 
+    const serializedDescription = serializeJobDescription({
+      description,
+      guidelines,
+      focusAreas,
+      persona
+    });
+
     setIsSubmitting(true);
     try {
       if (isEditMode && editId) {
         await updateJob(editId, {
           title: jobPosition,
           job_role: jobPosition, // Ensure role tracks title
-          description,
+          description: serializedDescription,
           duration_minutes: duration,
-          interview_type: selectedTypes
+          interview_type: selectedTypes,
+          experienceLevel
         });
         toast.success("Interview updated successfully!");
         onSuccess();
       } else {
-        const newJob = await createJob(jobPosition, description, duration, selectedTypes);
+        const newJob = await createJob(jobPosition, serializedDescription, duration, selectedTypes, experienceLevel);
         if (newJob) {
           setCreatedJobId(newJob.id);
           toast.success("AI Agent Deployed! Job created successfully.");
@@ -118,6 +166,10 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
     setDescription('');
     setSelectedTypes(['Technical']);
     setDuration(15);
+    setExperienceLevel('Mid-Level');
+    setGuidelines('');
+    setFocusAreas('');
+    setPersona('Sarah');
   };
 
   // --- SUCCESS STATE ---
@@ -136,7 +188,7 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, type: "spring" }}
-            className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center text-white mx-auto mb-6 shadow-green-500/40 shadow-xl"
+            className="w-20 h-20 bg-purple-600 rounded-full flex items-center justify-center text-white mx-auto mb-6 shadow-purple-500/40 shadow-xl"
           >
             <Check size={40} strokeWidth={4} />
           </motion.div>
@@ -145,7 +197,7 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
             Your AI Interview is Ready!
           </h2>
           <p className={cn("text-base mb-8", theme === 'light' ? "text-gray-500" : "text-gray-400")}>
-            Share this link with candidates to start the interview process for <span className="font-semibold text-purple-500">{jobPosition}</span>.
+            Share this link with candidates to start the interview process for <span className="font-semibold text-purple-600">{jobPosition}</span>.
           </p>
 
           <div className={cn(
@@ -160,7 +212,7 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
             </div>
             <button
               onClick={handleCopyLink}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm flex items-center gap-2 transition-colors shadow-lg shadow-blue-600/20"
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-sm flex items-center gap-2 transition-colors shadow-lg shadow-purple-600/20"
             >
               <Copy size={16} /> Copy
             </button>
@@ -179,7 +231,7 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
             </button>
             <button
               onClick={handleCreateAnother}
-              className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-600/20"
+              className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-purple-600/20"
             >
               + Create New Interview
             </button>
@@ -224,7 +276,8 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
           <form onSubmit={handleSubmit} className="space-y-8">
             {/* Job Position */}
             <div className="space-y-2">
-              <label className={cn("text-sm font-semibold", theme === 'light' ? "text-gray-700" : "text-gray-300")}>
+              <label className={cn("text-sm font-semibold flex items-center gap-2", theme === 'light' ? "text-gray-700" : "text-gray-300")}>
+                <Briefcase size={16} className="text-purple-500" />
                 Job Position
               </label>
               <input
@@ -234,8 +287,8 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
                 className={cn(
                   "w-full px-4 py-3 rounded-xl border outline-none transition-all text-base",
                   theme === 'light'
-                    ? "bg-white border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 text-gray-900 placeholder:text-gray-400"
-                    : "bg-black/40 border-zinc-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white placeholder:text-zinc-600"
+                    ? "bg-white border-gray-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 text-gray-900 placeholder:text-gray-400"
+                    : "bg-black/40 border-zinc-700 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-white placeholder:text-zinc-650"
                 )}
                 disabled={isSubmitting}
               />
@@ -243,54 +296,244 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
 
             {/* Job Description */}
             <div className="space-y-2">
-              <label className={cn("text-sm font-semibold", theme === 'light' ? "text-gray-700" : "text-gray-300")}>
+              <label className={cn("text-sm font-semibold flex items-center gap-2", theme === 'light' ? "text-gray-700" : "text-gray-300")}>
+                <FileText size={16} className="text-purple-500" />
                 Job Description
               </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Enter detailed job description..."
-                rows={6}
+                placeholder="Enter detailed job description, responsibilities, and requirements..."
+                rows={5}
                 className={cn(
                   "w-full px-4 py-3 rounded-xl border outline-none transition-all text-base resize-none",
                   theme === 'light'
-                    ? "bg-white border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 text-gray-900 placeholder:text-gray-400"
-                    : "bg-black/40 border-zinc-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white placeholder:text-zinc-600"
+                    ? "bg-white border-gray-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 text-gray-900 placeholder:text-gray-400"
+                    : "bg-black/40 border-zinc-700 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-white placeholder:text-zinc-650"
                 )}
                 disabled={isSubmitting}
               />
             </div>
 
-            {/* Duration */}
-            <div className="space-y-2">
-              <label className={cn("text-sm font-semibold", theme === 'light' ? "text-gray-700" : "text-gray-300")}>
-                Interview Duration
+            {/* Target Experience Level */}
+            <div className="space-y-3">
+              <label className={cn("text-sm font-semibold flex items-center gap-2", theme === 'light' ? "text-gray-700" : "text-gray-300")}>
+                <Award size={16} className="text-purple-500" />
+                Target Experience Level
               </label>
-              <div className="relative">
-                <select
-                  value={duration}
-                  onChange={(e) => setDuration(Number(e.target.value))}
-                  className={cn(
-                    "w-full px-4 py-3 rounded-xl border outline-none transition-all text-base appearance-none cursor-pointer",
-                    theme === 'light'
-                      ? "bg-white border-gray-200 focus:border-blue-500 text-gray-900"
-                      : "bg-black/40 border-zinc-700 focus:border-blue-500 text-white"
-                  )}
-                  disabled={isSubmitting}
-                >
-                  {DURATIONS.map(d => (
-                    <option key={d} value={d}>{d} minutes</option>
-                  ))}
-                </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
-                  <Clock size={16} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {EXPERIENCE_LEVELS.map((level) => {
+                  const isSelected = experienceLevel === level.id;
+                  return (
+                    <div
+                      key={level.id}
+                      onClick={() => !isSubmitting && setExperienceLevel(level.id)}
+                      className={cn(
+                        "p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between hover:scale-[1.01] duration-200",
+                        isSelected
+                          ? theme === 'light'
+                            ? "bg-purple-50 border-purple-300 text-purple-950 ring-2 ring-purple-100"
+                            : "bg-purple-950/20 border-purple-500 text-white ring-1 ring-purple-500"
+                          : theme === 'light'
+                            ? "bg-white border-gray-200 hover:bg-gray-50 text-gray-700"
+                            : "bg-black/20 border-zinc-700 hover:bg-white/5 text-gray-300"
+                      )}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-sm">{level.label}</span>
+                          <div className={cn(
+                            "w-4 h-4 rounded-full border flex items-center justify-center",
+                            isSelected ? "border-purple-500 bg-purple-500 text-white" : "border-gray-300 dark:border-zinc-650"
+                          )}>
+                            {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                          </div>
+                        </div>
+                        <p className={cn("text-xs leading-relaxed", isSelected ? (theme === 'light' ? "text-purple-800" : "text-purple-200") : "text-gray-400")}>
+                          {level.desc}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* AI Recruiter Persona */}
+            <div className="space-y-3">
+              <label className={cn("text-sm font-semibold flex items-center gap-2", theme === 'light' ? "text-gray-700" : "text-gray-300")}>
+                <Brain size={16} className="text-purple-500" />
+                AI Recruiter Persona
+              </label>
+              <div className="grid grid-cols-1 gap-3">
+                {PERSONAS.map((p) => {
+                  const isSelected = persona === p.id;
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => !isSubmitting && setPersona(p.id)}
+                      className={cn(
+                        "p-4 rounded-xl border cursor-pointer transition-all flex items-start gap-4 hover:scale-[1.005] duration-200",
+                        isSelected
+                          ? theme === 'light'
+                            ? "bg-purple-50/80 border-purple-300 text-purple-950 ring-2 ring-purple-100"
+                            : "bg-purple-950/25 border-purple-500 text-white ring-1 ring-purple-500"
+                          : theme === 'light'
+                            ? "bg-white border-gray-200 hover:bg-gray-50 text-gray-700"
+                            : "bg-black/20 border-zinc-700 hover:bg-white/5 text-gray-300"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold",
+                        isSelected ? "bg-purple-600 text-white" : "bg-purple-100 text-purple-700 dark:bg-zinc-800 dark:text-purple-400"
+                      )}>
+                        {p.name[0]}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="font-bold text-sm mr-2">{p.name}</span>
+                            <span className="text-[10px] uppercase tracking-wider font-bold opacity-60">{p.role}</span>
+                          </div>
+                          <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full border", isSelected ? "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/40 dark:text-purple-200 dark:border-purple-800" : "bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400 dark:border-zinc-750")}>
+                            {p.desc}
+                          </span>
+                        </div>
+                        <p className={cn("text-xs mt-1 leading-relaxed", isSelected ? (theme === 'light' ? "text-purple-800" : "text-purple-200") : "text-gray-400")}>
+                          <span className="font-semibold">Style:</span> {p.tone}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Core Focus Skills */}
+            <div className="space-y-3">
+              <label className={cn("text-sm font-semibold flex items-center gap-2", theme === 'light' ? "text-gray-700" : "text-gray-300")}>
+                <Tag size={16} className="text-purple-500" />
+                Technical & Skill Focus
+              </label>
+              <input
+                value={focusAreas}
+                onChange={(e) => setFocusAreas(e.target.value)}
+                placeholder="e.g. React, Redux, Performance, System Design"
+                className={cn(
+                  "w-full px-4 py-3 rounded-xl border outline-none transition-all text-base",
+                  theme === 'light'
+                    ? "bg-white border-gray-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 text-gray-900 placeholder:text-gray-400"
+                    : "bg-black/40 border-zinc-700 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-white placeholder:text-zinc-650"
+                )}
+                disabled={isSubmitting}
+              />
+              <div className="space-y-1.5">
+                <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-zinc-500 tracking-wider">Quick Suggestions:</span>
+                <div className="flex flex-wrap gap-2">
+                  {SUGGESTED_SKILLS.map((skill) => {
+                    const isAdded = focusAreas.toLowerCase().includes(skill.toLowerCase());
+                    return (
+                      <button
+                        key={skill}
+                        type="button"
+                        onClick={() => handleAddSkill(skill)}
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-xs font-medium border transition-all hover:scale-[1.03]",
+                          isAdded
+                            ? "bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-800 dark:text-purple-350"
+                            : theme === 'light'
+                              ? "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                              : "bg-black/20 border-zinc-800 text-zinc-400 hover:bg-white/5"
+                        )}
+                      >
+                        {isAdded ? `✓ ${skill}` : `+ ${skill}`}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Guidelines */}
+            <div className="space-y-2">
+              <label className={cn("text-sm font-semibold flex items-center gap-2", theme === 'light' ? "text-gray-700" : "text-gray-300")}>
+                <BookOpen size={16} className="text-purple-500" />
+                Custom Interviewer Guidelines
+              </label>
+              <textarea
+                value={guidelines}
+                onChange={(e) => setGuidelines(e.target.value)}
+                placeholder="Specific guidance for the AI recruiter (e.g. 'Ensure they walk through their thinking step-by-step', 'Focus on scalability and system tradeoffs', 'Do not provide coding solutions if they get stuck')"
+                rows={3}
+                className={cn(
+                  "w-full px-4 py-3 rounded-xl border outline-none transition-all text-base resize-none",
+                  theme === 'light'
+                    ? "bg-white border-gray-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 text-gray-900 placeholder:text-gray-400"
+                    : "bg-black/40 border-zinc-700 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-white placeholder:text-zinc-650"
+                )}
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {/* Duration & Visual Timeline */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className={cn("text-sm font-semibold flex items-center gap-2", theme === 'light' ? "text-gray-700" : "text-gray-300")}>
+                  <Clock size={16} className="text-purple-500" />
+                  Interview Duration
+                </label>
+                <div className="relative">
+                  <select
+                    value={duration}
+                    onChange={(e) => setDuration(Number(e.target.value))}
+                    className={cn(
+                      "w-full px-4 py-3 rounded-xl border outline-none transition-all text-base appearance-none cursor-pointer",
+                      theme === 'light'
+                        ? "bg-white border-gray-200 focus:border-purple-500 text-gray-900"
+                        : "bg-black/40 border-zinc-700 focus:border-purple-500 text-white"
+                    )}
+                    disabled={isSubmitting}
+                  >
+                    {DURATIONS.map(d => (
+                      <option key={d} value={d}>{d} minutes</option>
+                    ))}
+                  </select>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
+                    <Clock size={16} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Visual Breakdown Timeline */}
+              <div className={cn(
+                "p-4 rounded-xl border text-xs space-y-3",
+                theme === 'light' ? "bg-purple-50/20 border-purple-100 text-gray-600" : "bg-black/20 border-zinc-800 text-zinc-400"
+              )}>
+                <div className="font-bold flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                  <ListChecks size={14} />
+                  Interview Session Timeline Breakdown ({duration} minutes)
+                </div>
+                <div className="relative pl-4 border-l border-purple-200 dark:border-purple-900/50 space-y-3">
+                  <div className="relative">
+                    <div className="absolute -left-[20.5px] top-0.5 w-2 h-2 rounded-full bg-purple-500" />
+                    <span className="font-bold text-gray-800 dark:text-gray-300">Start (0:00 - 3:00):</span> Introduction by {persona}, Candidate icebreaker, and verification.
+                  </div>
+                  <div className="relative">
+                    <div className="absolute -left-[20.5px] top-0.5 w-2 h-2 rounded-full bg-purple-500" />
+                    <span className="font-bold text-gray-800 dark:text-gray-300">Core Assessment (3:00 - {duration - 3}:00):</span> Screening on key skills ({focusAreas || 'relevant job skills'}) adapted to {experienceLevel} seniority.
+                  </div>
+                  <div className="relative">
+                    <div className="absolute -left-[20.5px] top-0.5 w-2 h-2 rounded-full bg-purple-500" />
+                    <span className="font-bold text-gray-800 dark:text-gray-300">Wrap-up ({duration - 3}:00 - {duration}:00):</span> Candidate Q&A, feedback registration, and session closing.
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Interview Types (Chips) */}
             <div className="space-y-3">
-              <label className={cn("text-sm font-semibold", theme === 'light' ? "text-gray-700" : "text-gray-300")}>
+              <label className={cn("text-sm font-semibold flex items-center gap-2", theme === 'light' ? "text-gray-700" : "text-gray-300")}>
+                <Sparkles size={16} className="text-purple-500" />
                 Interview Types
               </label>
               <div className="flex flex-wrap gap-3">
@@ -305,7 +548,9 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
                       className={cn(
                         "px-4 py-2 rounded-full text-sm font-medium border flex items-center gap-2 transition-all",
                         isSelected
-                          ? "bg-blue-50 border-blue-200 text-blue-700 ring-2 ring-blue-100 ring-offset-0"
+                          ? theme === 'light'
+                            ? "bg-purple-50 border-purple-200 text-purple-700 ring-2 ring-purple-100"
+                            : "bg-purple-950/30 border-purple-500 text-purple-300 ring-1 ring-purple-500"
                           : (theme === 'light' ? "bg-white border-gray-200 text-gray-600 hover:bg-gray-50" : "bg-black/20 border-zinc-700 text-gray-300 hover:bg-white/5")
                       )}
                     >
@@ -322,12 +567,12 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-4 flex gap-3 text-blue-800 dark:text-blue-200"
+                className="bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-850 rounded-xl p-4 flex gap-3 text-purple-800 dark:text-purple-200"
               >
-                <Loader2 className="animate-spin shrink-0" size={20} />
+                <Loader2 className="animate-spin shrink-0 text-purple-600" size={20} />
                 <div>
-                  <h4 className="font-bold text-sm">Generating Interview Questions</h4>
-                  <p className="text-xs mt-1 opacity-80">Our AI is crafting personalized questions based on your requirements...</p>
+                  <h4 className="font-bold text-sm">Deploying AI Interview Agent</h4>
+                  <p className="text-xs mt-1 opacity-80">Our engine is configuring {persona} to conduct a professional {experienceLevel} interview...</p>
                 </div>
               </motion.div>
             )}
@@ -348,10 +593,10 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
 
               <button
                 type="submit"
-                className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-600/20 flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-8 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-purple-600/20 flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Processing...' : (isEditMode ? 'Update Interview' : 'Generate Questions')}
+                {isSubmitting ? 'Deploying...' : (isEditMode ? 'Update Interview' : 'Deploy AI Recruiter')}
                 {!isSubmitting && <ArrowRight size={16} />}
               </button>
             </div>

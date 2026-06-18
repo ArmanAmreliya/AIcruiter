@@ -9,17 +9,18 @@ generator client {
 }
 
 model User {
-  id          String   @id @default(uuid())
-  email       String   @unique
-  fullName    String?
-  role        String?
-  companyName String?
-  website     String?
-  aiCredits   Int      @default(100)
-  onboarded   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  jobs        Job[]
+  id                   String   @id @default(uuid())
+  email                String   @unique
+  fullName             String?
+  role                 String?
+  companyName          String?
+  website              String?
+  aiCredits            Int      @default(100)
+  onboarded            Boolean  @default(false)
+  notificationSettings String   @default("{}")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  jobs                 Job[]
 }
 
 model Job {

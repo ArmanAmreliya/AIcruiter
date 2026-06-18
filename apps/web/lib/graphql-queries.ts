@@ -10,6 +10,7 @@ export const GET_DASHBOARD_DATA = gql`
       aiCredits
       email
       website
+      notificationSettings
     }
     jobs {
       id
@@ -31,14 +32,15 @@ export const GET_DASHBOARD_DATA = gql`
 `;
 
 export const UPDATE_PROFILE = gql`
-  mutation UpdateProfile($fullName: String, $companyName: String, $role: String, $website: String) {
-    updateProfile(fullName: $fullName, companyName: $companyName, role: $role, website: $website) {
+  mutation UpdateProfile($fullName: String, $companyName: String, $role: String, $website: String, $notificationSettings: String) {
+    updateProfile(fullName: $fullName, companyName: $companyName, role: $role, website: $website, notificationSettings: $notificationSettings) {
       id
       fullName
       companyName
       role
       website
       email
+      notificationSettings
     }
   }
 `;
@@ -53,6 +55,7 @@ export const FETCH_JOB_BY_ID = gql`
       candidateCount
       createdAt
       durationMinutes
+      experienceLevel
       user {
         companyName
       }
@@ -61,24 +64,26 @@ export const FETCH_JOB_BY_ID = gql`
 `;
 
 export const CREATE_JOB = gql`
-  mutation CreateJob($title: String!, $description: String!, $durationMinutes: Int, $interviewType: [String!]) {
-    createJob(title: $title, description: $description, durationMinutes: $durationMinutes, interviewType: $interviewType) {
+  mutation CreateJob($title: String!, $description: String!, $durationMinutes: Int, $interviewType: [String!], $experienceLevel: String) {
+    createJob(title: $title, description: $description, durationMinutes: $durationMinutes, interviewType: $interviewType, experienceLevel: $experienceLevel) {
       id
       title
       description
       status
+      experienceLevel
       createdAt
     }
   }
 `;
 
 export const UPDATE_JOB = gql`
-  mutation UpdateJob($id: ID!, $title: String, $description: String, $durationMinutes: Int, $interviewType: [String!], $status: String) {
-    updateJob(id: $id, title: $title, description: $description, durationMinutes: $durationMinutes, interviewType: $interviewType, status: $status) {
+  mutation UpdateJob($id: ID!, $title: String, $description: String, $durationMinutes: Int, $interviewType: [String!], $status: String, $experienceLevel: String) {
+    updateJob(id: $id, title: $title, description: $description, durationMinutes: $durationMinutes, interviewType: $interviewType, status: $status, experienceLevel: $experienceLevel) {
       id
       title
       description
       status
+      experienceLevel
       createdAt
     }
   }

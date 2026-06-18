@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { prisma } from '@aicruiter/db';
 import { queueCandidateReportJob } from './services/queue';
+import { sendEmail } from './services/mail';
 
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') }); // Load .env from monorepo root
 
@@ -60,6 +61,25 @@ async function ensureUser(userId: string) {
           role,
           aiCredits: 100,
           onboarded,
+          notificationSettings: JSON.stringify({
+            email_new_candidate: true,
+            email_interview_complete: true,
+            push_updates: false,
+            marketing: false
+          })
+        }
+      });
+    }
+    if (user && !user.notificationSettings) {
+      user = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          notificationSettings: JSON.stringify({
+            email_new_candidate: true,
+            email_interview_complete: true,
+            push_updates: false,
+            marketing: false
+          })
         }
       });
     }
@@ -80,6 +100,7 @@ const typeDefs = `#graphql
     website: String
     aiCredits: Int!
     onboarded: Boolean!
+    notificationSettings: String!
     createdAt: String!
     updatedAt: String!
   }
@@ -142,9 +163,9 @@ const typeDefs = `#graphql
   }
 
   type Mutation {
-    updateProfile(fullName: String, companyName: String, role: String, website: String): User!
-    createJob(title: String!, description: String!, durationMinutes: Int, interviewType: [String!]): Job!
-    updateJob(id: ID!, title: String, description: String, durationMinutes: Int, interviewType: [String!], status: String): Job!
+    updateProfile(fullName: String, companyName: String, role: String, website: String, notificationSettings: String): User!
+    createJob(title: String!, description: String!, durationMinutes: Int, interviewType: [String!], experienceLevel: String): Job!
+    updateJob(id: ID!, title: String, description: String, durationMinutes: Int, interviewType: [String!], status: String, experienceLevel: String): Job!
     deleteJob(id: ID!): Boolean!
     updateCandidateStatus(id: ID!, status: String!): Candidate!
     
@@ -224,7 +245,9 @@ const resolvers = {
     },
     user: async (parent: any) => {
       return prisma.user.findUnique({ where: { id: parent.userId } });
-    }
+    },
+    createdAt: (parent: any) => parent.createdAt?.toISOString(),
+    updatedAt: (parent: any) => parent.updatedAt?.toISOString()
   },
 
   Candidate: {
@@ -240,7 +263,9 @@ const resolvers = {
         return (parent.metaData as any).overallScore || (parent.metaData as any).score || 0;
       }
       return 0;
-    }
+    },
+    createdAt: (parent: any) => parent.createdAt?.toISOString(),
+    updatedAt: (parent: any) => parent.updatedAt?.toISOString()
   },
 
   Activity: {
@@ -253,6 +278,12 @@ const resolvers = {
     }
   },
 
+  User: {
+    notificationSettings: (parent: any) => parent.notificationSettings || '{}',
+    createdAt: (parent: any) => parent.createdAt?.toISOString(),
+    updatedAt: (parent: any) => parent.updatedAt?.toISOString()
+  },
+
   Mutation: {
     updateProfile: async (_parent: any, args: any, context: Context) => {
       await ensureUser(context.userId);
@@ -263,6 +294,7 @@ const resolvers = {
           companyName: args.companyName ?? undefined,
           role: args.role ?? undefined,
           website: args.website ?? undefined,
+          notificationSettings: args.notificationSettings ?? undefined,
         }
       });
     },
@@ -277,7 +309,7 @@ const resolvers = {
           durationMinutes: args.durationMinutes || 15,
           interviewType: args.interviewType || ["Technical"],
           status: 'ACTIVE',
-          experienceLevel: 'Mid-Level',
+          experienceLevel: args.experienceLevel || 'Mid-Level',
         }
       });
 
@@ -300,6 +332,7 @@ const resolvers = {
           durationMinutes: args.durationMinutes ?? undefined,
           interviewType: args.interviewType ?? undefined,
           status: args.status ?? undefined,
+          experienceLevel: args.experienceLevel ?? undefined,
         }
       });
     },
@@ -329,7 +362,7 @@ const resolvers = {
         return existingCandidate;
       }
 
-      return prisma.candidate.create({
+      const candidate = await prisma.candidate.create({
         data: {
           jobId: args.jobId,
           name: args.name,
@@ -337,13 +370,68 @@ const resolvers = {
           status: 'STARTED',
         }
       });
+
+      // Send a background email alert to the recruiter
+      setImmediate(async () => {
+        try {
+          const job = await prisma.job.findUnique({
+            where: { id: args.jobId },
+            include: { user: true }
+          });
+          if (job && job.user) {
+            let settings = { email_new_candidate: true };
+            if (job.user.notificationSettings) {
+              try {
+                settings = JSON.parse(job.user.notificationSettings);
+              } catch (e) {}
+            }
+            if (settings.email_new_candidate !== false) {
+              await sendEmail({
+                to: job.user.email,
+                subject: `New Candidate Registered: ${args.name} for ${job.title}`,
+                htmlContent: `
+                  <div style="font-family: Arial, sans-serif; max-width: 600px; line-height: 1.6; color: #333; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; background-color: #ffffff;">
+                    <h2 style="color: #7c3aed; margin-top: 0;">New Candidate Registered</h2>
+                    <p>Hello <strong>${job.user.fullName || 'Recruiter'}</strong>,</p>
+                    <p>A new candidate has registered and started screening for the position: <strong>${job.title}</strong>.</p>
+                    <div style="background-color: #f8fafc; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                      <p style="margin: 0 0 8px 0;"><strong>Candidate Information:</strong></p>
+                      <ul style="margin: 0; padding-left: 20px; color: #475569;">
+                        <li><strong>Name:</strong> ${args.name}</li>
+                        <li><strong>Email:</strong> ${args.email}</li>
+                        <li><strong>Registration Time:</strong> ${new Date().toLocaleString()}</li>
+                      </ul>
+                    </div>
+                    <p>You will receive a detailed summary evaluation report as soon as they complete their interview session.</p>
+                    <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+                    <p style="font-size: 12px; color: #94a3b8; margin: 0;">This email was sent automatically by AIcruiter. You can manage alert preferences in settings.</p>
+                  </div>
+                `
+              });
+            }
+          }
+        } catch (err) {
+          console.error("Failed to send registration email alert:", err);
+        }
+      });
+
+      return candidate;
     },
     updateCandidateInterviewStatus: async (_parent: any, args: { id: string; status: string; metaData?: string }) => {
+      const existingCandidate = await prisma.candidate.findUnique({
+        where: { id: args.id }
+      });
+      const existingMeta = existingCandidate?.metaData && typeof existingCandidate.metaData === 'object' ? (existingCandidate.metaData as any) : {};
+      const newMeta = args.metaData ? JSON.parse(args.metaData) : {};
+
       const candidate = await prisma.candidate.update({
         where: { id: args.id },
         data: {
           status: args.status,
-          metaData: args.metaData ? JSON.parse(args.metaData) : undefined,
+          metaData: {
+            ...existingMeta,
+            ...newMeta
+          },
         }
       });
 

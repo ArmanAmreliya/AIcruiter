@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Mic, MicOff, PhoneOff, Video, VideoOff, Maximize2, ShieldCheck, Loader2, ArrowRight, Moon, Sun } from 'lucide-react';
 import { useAIInterviewer } from '../../hooks/useAIInterviewer';
 import { useTheme } from '../../context/ThemeContext';
-import { cn } from '../../lib/utils';
+import { cn, parseJobDescription } from '../../lib/utils';
 import { toast } from 'sonner';
 import { apolloClient } from '../../lib/apollo-client';
 import { FETCH_JOB_BY_ID } from '../../lib/graphql-queries';
@@ -60,6 +60,10 @@ export const InterviewRoom = () => {
     const jobTitle = job?.title || 'Position';
     const companyName = job?.user?.companyName || 'AIcruiter';
     const jobDescription = job?.description || '';
+    const experienceLevel = job?.experienceLevel || 'Mid-Level';
+
+    const { persona } = parseJobDescription(jobDescription);
+    const personaName = persona === 'David' ? 'David' : persona === 'Emma' ? 'Emma' : 'Sarah';
 
     // Timer State
     const sessionDuration = location.state?.duration 
@@ -81,7 +85,7 @@ export const InterviewRoom = () => {
         transcript,
         history,
         startInterview
-    } = useAIInterviewer(jobId!, candidateId, candidateName, jobTitle, companyName, jobDescription);
+    } = useAIInterviewer(jobId!, candidateId, candidateName, jobTitle, companyName, jobDescription, experienceLevel);
 
     // --- Session Timer Effect ---
     useEffect(() => {
@@ -328,7 +332,7 @@ export const InterviewRoom = () => {
                                 "text-sm mb-8 leading-relaxed",
                                 theme === 'light' ? "text-slate-500" : "text-slate-400"
                             )}>
-                                Make sure your camera and microphone are properly adjusted. Recruiter Sarah is ready to guide you.
+                                Make sure your camera and microphone are properly adjusted. Recruiter {personaName} is ready to guide you.
                             </p>
                             <button
                                 onClick={handleStartInterview}
@@ -356,7 +360,7 @@ export const InterviewRoom = () => {
                                     </>
                                 ) : (
                                     <>
-                                        Start Interview with Sarah <ArrowRight size={18} />
+                                        Start Interview with {personaName} <ArrowRight size={18} />
                                     </>
                                 )}
                             </button>
@@ -367,7 +371,7 @@ export const InterviewRoom = () => {
                                 <h3 className={cn(
                                     "text-2xl font-bold mb-2 tracking-tight transition-colors duration-500",
                                     theme === 'light' ? "text-slate-800" : "text-white"
-                                )}>Recruiter Sarah</h3>
+                                )}>Recruiter {personaName}</h3>
                                 <p className={cn(
                                     "text-sm font-medium tracking-wide first-letter:uppercase transition-colors duration-500",
                                     theme === 'light' ? "text-slate-400" : "opacity-50"
@@ -539,7 +543,7 @@ export const InterviewRoom = () => {
                                 )}
                             >
                                 <span className="mb-0.5 font-bold opacity-65">
-                                    {msg.role === 'assistant' ? 'Sarah (AI Recruiter)' : 'You'}
+                                    {msg.role === 'assistant' ? `${personaName} (AI Recruiter)` : 'You'}
                                 </span>
                                 <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                             </div>

@@ -70,6 +70,7 @@ export const useAiCruiter = () => {
           aiCredits: data.me.aiCredits || 0,
           email: data.me.email || '',
           website: data.me.website || '',
+          notificationSettings: data.me.notificationSettings || '{}',
         });
       }
 
@@ -144,7 +145,8 @@ export const useAiCruiter = () => {
     title: string,
     description: string,
     duration: number = 15,
-    interviewTypes: string[] = ["Technical"]
+    interviewTypes: string[] = ["Technical"],
+    experienceLevel: string = "Mid-Level"
   ) => {
     setLoading(true);
     try {
@@ -157,7 +159,8 @@ export const useAiCruiter = () => {
           title,
           description,
           durationMinutes: duration,
-          interviewType: interviewTypes
+          interviewType: interviewTypes,
+          experienceLevel
         },
         context: {
           headers: {
@@ -188,6 +191,7 @@ export const useAiCruiter = () => {
       duration_minutes?: number;
       interview_type?: string[];
       status?: 'ACTIVE' | 'DRAFT' | 'CLOSED';
+      experienceLevel?: string;
     }
   ) => {
     setLoading(true);
@@ -220,7 +224,8 @@ export const useAiCruiter = () => {
           description: updates.description,
           durationMinutes: updates.duration_minutes,
           interviewType: updates.interview_type,
-          status: updates.status
+          status: updates.status,
+          experienceLevel: updates.experienceLevel
         },
         context: {
           headers: {
@@ -263,7 +268,7 @@ export const useAiCruiter = () => {
     }
   };
 
-  const updateProfile = async (fullName?: string, companyName?: string, role?: string, website?: string) => {
+  const updateProfile = async (fullName?: string, companyName?: string, role?: string, website?: string, notificationSettings?: string) => {
     setLoading(true);
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -275,7 +280,8 @@ export const useAiCruiter = () => {
           fullName,
           companyName,
           role,
-          website
+          website,
+          notificationSettings
         },
         context: {
           headers: {
@@ -295,7 +301,7 @@ export const useAiCruiter = () => {
   };
 
   return {
-    user: user || { name: 'Loading...', company: '...', aiCredits: 0, email: '', id: '', role: '', website: '' }, // Safe default
+    user: user || { name: 'Loading...', company: '...', aiCredits: 0, email: '', id: '', role: '', website: '', notificationSettings: '{}' }, // Safe default
     jobs,
     recentActivity,
     stats,

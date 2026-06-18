@@ -189,13 +189,25 @@ const CompanySettings = ({
     </div>
 );
 
-const NotificationSettings = ({ theme }: { theme: string }) => {
-    const [toggles, setToggles] = useState({
-        email_new_candidate: true,
-        email_interview_complete: true,
-        push_updates: false,
-        marketing: false
-    });
+const NotificationSettings = ({ 
+    theme, 
+    toggles, 
+    setToggles 
+}: { 
+    theme: string; 
+    toggles: {
+        email_new_candidate: boolean;
+        email_interview_complete: boolean;
+        push_updates: boolean;
+        marketing: boolean;
+    };
+    setToggles: React.Dispatch<React.SetStateAction<{
+        email_new_candidate: boolean;
+        email_interview_complete: boolean;
+        push_updates: boolean;
+        marketing: boolean;
+    }>>;
+}) => {
 
     const Toggle = ({ checked, onChange, label, desc }: any) => (
         <div className="flex items-center justify-between py-4 border-b border-gray-100 dark:border-white/5 last:border-0">
@@ -323,6 +335,12 @@ export const SettingsPage = () => {
     const [companyName, setCompanyName] = useState('');
     const [website, setWebsite] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [notificationSettings, setNotificationSettings] = useState({
+        email_new_candidate: true,
+        email_interview_complete: true,
+        push_updates: false,
+        marketing: false
+    });
 
     // Sync state with loaded user values
     useEffect(() => {
@@ -331,6 +349,17 @@ export const SettingsPage = () => {
             setRole(user.role || '');
             setCompanyName(user.company || '');
             setWebsite(user.website || '');
+            if (user.notificationSettings) {
+                try {
+                    const parsed = JSON.parse(user.notificationSettings);
+                    setNotificationSettings(prev => ({
+                        ...prev,
+                        ...parsed
+                    }));
+                } catch (e) {
+                    console.error("Failed to parse notification settings:", e);
+                }
+            }
         }
     }, [user]);
 
@@ -345,7 +374,7 @@ export const SettingsPage = () => {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            await updateProfile(fullName, companyName, role, website);
+            await updateProfile(fullName, companyName, role, website, JSON.stringify(notificationSettings));
             toast.success("Settings saved successfully");
         } catch (error: any) {
             console.error("Failed to save settings:", error);
@@ -432,7 +461,13 @@ export const SettingsPage = () => {
                                 setWebsite={setWebsite}
                             />
                         )}
-                        {activeTab === 'notifications' && <NotificationSettings theme={theme} />}
+                         {activeTab === 'notifications' && (
+                            <NotificationSettings 
+                                theme={theme} 
+                                toggles={notificationSettings} 
+                                setToggles={setNotificationSettings} 
+                            />
+                        )}
                         {activeTab === 'security' && <SecuritySettings theme={theme} />}
                         {activeTab === 'billing' && (
                             <div className="text-center py-20 animate-fade-in-up">

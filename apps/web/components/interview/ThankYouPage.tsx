@@ -17,13 +17,40 @@ export const ThankYouPage = () => {
     useEffect(() => {
         setTheme('light');
     }, [setTheme]);
+
+    const candidateId = location.state?.candidateId;
+    const jobId = location.state?.jobId;
+
+    // Automatically mark the candidate interview as COMPLETED on mount
+    useEffect(() => {
+        const markInterviewCompleted = async () => {
+            if (candidateId) {
+                try {
+                    const meta = {
+                        ...(location.state?.meta_data || {}),
+                        completed_at: new Date().toISOString()
+                    };
+                    await apolloClient.mutate({
+                        mutation: UPDATE_CANDIDATE_INTERVIEW_STATUS,
+                        variables: {
+                            id: candidateId,
+                            status: 'COMPLETED',
+                            metaData: JSON.stringify(meta)
+                        }
+                    });
+                    console.log("Candidate interview auto-completed on mount.");
+                } catch (err) {
+                    console.error("Error auto-completing interview on mount:", err);
+                }
+            }
+        };
+        markInterviewCompleted();
+    }, [candidateId]);
+
     const [rating, setRating] = useState(0);
     const [feedback, setFeedback] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
-
-    const candidateId = location.state?.candidateId;
-    const jobId = location.state?.jobId;
 
     const handleSubmitFeedback = async () => {
         if (rating === 0) {
@@ -38,7 +65,7 @@ export const ThankYouPage = () => {
                 const meta = {
                     ...(location.state?.meta_data || {}),
                     rating,
-                    feedback,
+                    candidateFeedback: feedback,
                     completed_at: new Date().toISOString()
                 };
 

@@ -7,6 +7,7 @@ export interface User {
   aiCredits: number;
   email: string;
   website?: string;
+  notificationSettings?: string;
 }
 
 export interface Job {

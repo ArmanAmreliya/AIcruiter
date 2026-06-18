@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { apolloClient } from '../lib/apollo-client';
 import { GET_DEEPGRAM_TOKEN } from '../lib/graphql-queries';
 import { toast } from 'sonner';
+import { parseJobDescription } from '../lib/utils';
 
 // --- Safe Environment Fetch Helper ---
 const getEnv = (key: string): string | undefined => {
@@ -23,7 +24,8 @@ export const useAIInterviewer = (
     candidateName: string, 
     jobTitle: string, 
     companyName: string,
-    jobDescription: string = ""
+    jobDescription: string = "",
+    experienceLevel: string = "Mid-Level"
 ) => {
     const [status, setStatus] = useState<InterviewStatus>('IDLE');
     const [transcript, setTranscript] = useState('');
@@ -31,12 +33,12 @@ export const useAIInterviewer = (
     const [history, setHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
     const [logs, setLogs] = useState<string[]>([]);
 
-    const contextRef = useRef({ jobTitle, companyName, jobDescription, candidateName });
+    const contextRef = useRef({ jobTitle, companyName, jobDescription, candidateName, experienceLevel });
     const historyRef = useRef<{ role: 'user' | 'assistant', content: string }[]>([]);
 
     useEffect(() => {
-        contextRef.current = { jobTitle, companyName, jobDescription, candidateName };
-    }, [jobTitle, companyName, jobDescription, candidateName]);
+        contextRef.current = { jobTitle, companyName, jobDescription, candidateName, experienceLevel };
+    }, [jobTitle, companyName, jobDescription, candidateName, experienceLevel]);
 
     useEffect(() => {
         historyRef.current = history;
@@ -90,26 +92,57 @@ export const useAIInterviewer = (
         setStatus('THINKING');
         logTrace(`Stored candidate response: "${userText}"`);
 
-        const { jobTitle: title, companyName: company, jobDescription: description, candidateName: candidate } = contextRef.current;
-        logTrace(`Preparing Groq LLM context for candidate "${candidate}" matching role "${title}" at "${company}"`);
+        const { jobTitle: title, companyName: company, jobDescription: description, candidateName: candidate, experienceLevel } = contextRef.current;
+        const { description: cleanDescription, guidelines, focusAreas, persona } = parseJobDescription(description);
+
+        const personaPrompts: Record<string, { name: string, description: string, tone: string }> = {
+            Sarah: {
+                name: "Sarah",
+                description: "a calm, warm, friendly, and highly professional female recruiter",
+                tone: "Maintain a supportive tone that feels encouraging, attentive, and professional."
+            },
+            David: {
+                name: "David",
+                description: "a precise, highly analytical, and direct senior technical lead interviewer",
+                tone: "Maintain a rigorous, analytical, and direct tone. Challenge the candidate on technical tradeoffs and exact details, but remain professional."
+            },
+            Emma: {
+                name: "Emma",
+                description: "an energetic, fast-paced, and highly conversational talent partner",
+                tone: "Maintain an energetic, engaging, and highly conversational tone. Focus on speed, collaboration, outcomes, and clear communication."
+            }
+        };
+
+        const activePersona = personaPrompts[persona] || personaPrompts.Sarah;
+
+        logTrace(`Preparing Groq LLM context for candidate "${candidate}" matching role "${title}" (${experienceLevel}) with AI Persona "${activePersona.name}" at "${company}"`);
         
-        const systemPrompt = `You are Sarah, a calm, warm, friendly, and highly professional female recruiter at ${company}.
-    You are interviewing the candidate (${candidate}) for the position of ${title}.
+        let promptDetails = '';
+        if (focusAreas) {
+            promptDetails += `\n* **Core Skills/Focus Areas to Assess**: ${focusAreas}`;
+        }
+        if (guidelines) {
+            promptDetails += `\n* **Special Guidelines/Instructions**: ${guidelines}`;
+        }
+
+        const systemPrompt = `You are ${activePersona.name}, ${activePersona.description} at ${company}.
+    You are interviewing the candidate (${candidate}) for the position of ${title} (Target Experience Level: ${experienceLevel}).
 
 Here is the Job Description for this position:
 """
-${description}
+${cleanDescription}
 """
+${promptDetails}
 
 **Your Task:**
 1. Start the interview with a brief candidate introduction first, then move into the questions. Do not give a long introduction or ask for permission to begin.
 2. Begin with fundamentals, then move to medium-difficulty questions, and finish with hard questions.
-3. Screen the candidate specifically for the skills, requirements, and responsibilities detailed in the Job Description above.
+3. Screen the candidate specifically for the skills, requirements, and responsibilities detailed in the Job Description and focus areas above.
 4. Ask ONE question at a time.
 5. After each candidate answer, ask a thoughtful follow-up based on what they actually said.
 6. Probe for depth with gentle but targeted follow-ups like implementation details, tradeoffs, edge cases, ownership, and outcomes.
 7. Keep the flow structured and adaptive: if a candidate answers strongly, raise difficulty; if they struggle, stay one level deeper on fundamentals before moving up.
-8. Maintain a supportive tone that feels encouraging, attentive, and professional.
+8. ${activePersona.tone}
 
 **Speaking Style:**
 * Speak directly, clearly, and naturally. Use short sentences and contractions (e.g. "I'm", "Let's").
@@ -439,10 +472,12 @@ ${description}
             logTrace("MediaRecorder started capture cycle (250ms audio chunk slices).");
 
             // Initial Greet
-            const { jobTitle: title, companyName: company, candidateName: candidate } = contextRef.current;
+            const { jobTitle: title, companyName: company, candidateName: candidate, jobDescription: description } = contextRef.current;
+            const { persona } = parseJobDescription(description);
+            const personaName = (persona === 'David' ? 'David' : persona === 'Emma' ? 'Emma' : 'Sarah');
             if (historyRef.current.length === 0) {
-                const greetMsg = `Hi ${candidate}, thanks for joining. I'm Sarah, a recruiter here at ${company}. Shall we start the interview for the ${title} position?`;
-                logTrace("Triggering Sarah's initial greeting message.");
+                const greetMsg = `Hi ${candidate}, thanks for joining. I'm ${personaName}, a recruiter here at ${company}. Shall we start the interview for the ${title} position?`;
+                logTrace(`Triggering ${personaName}'s initial greeting message.`);
                 speak(greetMsg);
                 historyRef.current = [{ role: 'assistant', content: greetMsg }];
                 setHistory(historyRef.current);
