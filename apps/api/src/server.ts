@@ -5,10 +5,14 @@ import fastifyApollo, { fastifyApolloDrainPlugin } from '@as-integrations/fastif
 import dotenv from 'dotenv';
 import path from 'path';
 import { prisma } from '@aicruiter/db';
+import { createClerkClient, verifyToken } from '@clerk/backend';
 import { queueCandidateReportJob } from './services/queue';
 import { sendEmail } from './services/mail';
 
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') }); // Load .env from monorepo root
+
+// Initialize Clerk Backend Client
+const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 // Default fallback user ID for demo/dev purposes
 const DEFAULT_USER_ID = 'demo-recruiter-id-123';
@@ -30,25 +34,15 @@ async function ensureUser(userId: string) {
         fullName = 'New Recruiter';
         companyName = 'Company Inc.';
         role = 'Hiring Manager';
-        try {
-          const authUsers: any[] = await (prisma as any).$queryRawUnsafe(
-            `SELECT email, raw_user_meta_data FROM auth.users WHERE id = $1::uuid LIMIT 1`,
-            userId
-          );
-          if (authUsers && authUsers.length > 0) {
-            email = authUsers[0].email || 'new-user@example.com';
-            const meta = authUsers[0].raw_user_meta_data;
-            if (meta && typeof meta === 'object' && meta !== null) {
-              fullName = meta.full_name || fullName;
-            } else if (meta && typeof meta === 'string') {
-              try {
-                const parsed = JSON.parse(meta);
-                fullName = parsed.full_name || fullName;
-              } catch(e) {}
-            }
+        
+        if (userId.startsWith('user_')) {
+          try {
+            const clerkUser = await clerkClient.users.getUser(userId);
+            email = clerkUser.emailAddresses[0]?.emailAddress || email;
+            fullName = `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || fullName;
+          } catch (err) {
+            console.warn(`Could not query Clerk users for ${userId}:`, err);
           }
-        } catch (err) {
-          console.warn(`Could not query auth.users for ${userId}:`, err);
         }
       }
 
@@ -182,11 +176,9 @@ interface Context {
 const resolvers = {
   Query: {
     me: async (_parent: any, _args: any, context: Context) => {
-      await ensureUser(context.userId);
       return prisma.user.findUnique({ where: { id: context.userId } });
     },
     jobs: async (_parent: any, _args: any, context: Context) => {
-      await ensureUser(context.userId);
       return prisma.job.findMany({
         where: { userId: context.userId },
         orderBy: { createdAt: 'desc' }
@@ -196,7 +188,6 @@ const resolvers = {
       return prisma.job.findUnique({ where: { id: args.id } });
     },
     candidates: async (_parent: any, args: { jobId?: string }, context: Context) => {
-      await ensureUser(context.userId);
       if (args.jobId) {
         return prisma.candidate.findMany({
           where: { jobId: args.jobId },
@@ -209,7 +200,6 @@ const resolvers = {
       });
     },
     activities: async (_parent: any, _args: any, context: Context) => {
-      await ensureUser(context.userId);
       return prisma.activity.findMany({
         where: { userId: context.userId },
         orderBy: { createdAt: 'desc' },
@@ -217,7 +207,6 @@ const resolvers = {
       });
     },
     dashboardStats: async (_parent: any, _args: any, context: Context) => {
-      await ensureUser(context.userId);
       const totalCandidates = await prisma.candidate.count({
         where: { job: { userId: context.userId } }
       });
@@ -286,7 +275,6 @@ const resolvers = {
 
   Mutation: {
     updateProfile: async (_parent: any, args: any, context: Context) => {
-      await ensureUser(context.userId);
       return prisma.user.update({
         where: { id: context.userId },
         data: {
@@ -299,7 +287,6 @@ const resolvers = {
       });
     },
     createJob: async (_parent: any, args: any, context: Context) => {
-      await ensureUser(context.userId);
       const job = await prisma.job.create({
         data: {
           userId: context.userId,
@@ -502,9 +489,30 @@ const startServer = async () => {
 
   await fastify.register(fastifyApollo(apollo), {
     context: async (request: FastifyRequest) => {
-      // Allow custom X-User-Id or Auth headers to simulate/identify users
-      const rawUserId = request.headers['x-user-id'] || request.headers['authorization'];
-      const userId = typeof rawUserId === 'string' ? rawUserId : DEFAULT_USER_ID;
+      let userId = DEFAULT_USER_ID;
+      const authHeader = request.headers['authorization'];
+      const xUserId = request.headers['x-user-id'];
+
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        try {
+          const verified = await verifyToken(token, {
+            secretKey: process.env.CLERK_SECRET_KEY,
+          });
+          userId = verified.sub;
+        } catch (error) {
+          console.error("Clerk token verification failed:", error);
+          if (typeof xUserId === 'string') {
+            userId = xUserId;
+          }
+        }
+      } else if (typeof xUserId === 'string') {
+        userId = xUserId;
+      }
+
+      // Provision/sync user profile exactly once per request lifecycle
+      await ensureUser(userId);
+
       return { userId };
     }
   });

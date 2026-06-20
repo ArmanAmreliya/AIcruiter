@@ -1,5 +1,6 @@
 import React from 'react';
 import Script from 'next/script';
+import { ClerkProvider } from '@clerk/nextjs';
 import { ClientProviders } from '../components/providers/ClientProviders';
 import '../index.css';
 
@@ -29,9 +30,12 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-background text-foreground selection:bg-purple-500/30">
-        <ClientProviders>
-          {children}
-        </ClientProviders>
+        {/* @ts-expect-error Server Component */}
+        <ClerkProvider>
+          <ClientProviders>
+            {children}
+          </ClientProviders>
+        </ClerkProvider>
       </body>
     </html>
   );

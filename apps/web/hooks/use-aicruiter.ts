@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../lib/supabase';
+import { useUser } from '@clerk/nextjs';
 import { apolloClient } from '../lib/apollo-client';
 import { 
   GET_DASHBOARD_DATA, 
@@ -26,6 +26,7 @@ const DEFAULT_USER: User = {
 
 export const useAiCruiter = () => {
   const router = useRouter();
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
   const [user, setUser] = useState<User | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
@@ -49,28 +50,21 @@ export const useAiCruiter = () => {
   };
 
   const fetchData = async () => {
-    try {
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-      if (authError || !authUser) {
-        console.warn("No authenticated user found for dashboard fetch:", authError);
-        setLoading(false);
-        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/dashboard')) {
-          router.push('/login');
-        }
-        return;
+    if (!clerkLoaded) return;
+    if (!clerkUser) {
+      setLoading(false);
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/dashboard')) {
+        router.push('/login');
       }
+      return;
+    }
 
-      console.log("Fetching dashboard data via GraphQL for user:", authUser.id);
+    try {
+      console.log("Fetching dashboard data via GraphQL for user:", clerkUser.id);
 
       const { data } = await apolloClient.query<any>({
         query: GET_DASHBOARD_DATA,
         fetchPolicy: 'network-only',
-        context: {
-          headers: {
-            'x-user-id': authUser.id,
-          }
-        }
       });
 
       if (data?.me) {
@@ -124,27 +118,12 @@ export const useAiCruiter = () => {
     }
   };
 
-  // Initial Fetch & Realtime Subscription
+  // Initial Fetch & Subscription update
   useEffect(() => {
-    fetchData();
-
-    // Subscribe to specific tables for Realtime updates from Supabase triggers
-    const channel = supabase.channel('dashboard_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
-        fetchData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'candidates' }, () => {
-        fetchData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, () => {
-        fetchData();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+    if (clerkLoaded) {
+      fetchData();
+    }
+  }, [clerkLoaded, clerkUser]);
 
   // 2. Calculated Stats
   const stats: DashboardStats = useMemo(() => {
@@ -169,8 +148,7 @@ export const useAiCruiter = () => {
   ) => {
     setLoading(true);
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) throw new Error("Not authenticated");
+      if (!clerkUser) throw new Error("Not authenticated");
 
       const { data } = await apolloClient.mutate<any>({
         mutation: CREATE_JOB,
@@ -180,11 +158,6 @@ export const useAiCruiter = () => {
           durationMinutes: duration,
           interviewType: interviewTypes,
           experienceLevel
-        },
-        context: {
-          headers: {
-            'x-user-id': authUser.id,
-          }
         }
       });
 
@@ -215,8 +188,7 @@ export const useAiCruiter = () => {
   ) => {
     setLoading(true);
 
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser) {
+    if (!clerkUser) {
       toast.error("You must be logged in to update an interview");
       setLoading(false);
       return null;
@@ -245,11 +217,6 @@ export const useAiCruiter = () => {
           interviewType: updates.interview_type,
           status: updates.status,
           experienceLevel: updates.experienceLevel
-        },
-        context: {
-          headers: {
-            'x-user-id': authUser.id,
-          }
         }
       });
 
@@ -290,8 +257,7 @@ export const useAiCruiter = () => {
   const updateProfile = async (fullName?: string, companyName?: string, role?: string, website?: string, notificationSettings?: string) => {
     setLoading(true);
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) throw new Error("Not authenticated");
+      if (!clerkUser) throw new Error("Not authenticated");
 
       const { data } = await apolloClient.mutate<any>({
         mutation: UPDATE_PROFILE,
@@ -301,11 +267,6 @@ export const useAiCruiter = () => {
           role,
           website,
           notificationSettings
-        },
-        context: {
-          headers: {
-            'x-user-id': authUser.id,
-          }
         }
       });
 

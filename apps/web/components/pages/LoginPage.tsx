@@ -8,7 +8,7 @@ import * as z from 'zod';
 import { motion } from 'framer-motion';
 import { Toaster, toast } from 'sonner';
 import { Loader2, ArrowLeft } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { useSignIn } from '@clerk/nextjs/legacy';
 import { LoadingLogo } from '../ui/LoadingLogo';
 import { cn } from '../../lib/utils';
 
@@ -28,6 +28,7 @@ interface LoginPageProps {
 
 export const LoginPage = ({ onBack, onNavigateSignup, onLoginSuccess }: LoginPageProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const { signIn, isLoaded, setActive } = useSignIn();
 
   const {
     register,
@@ -38,41 +39,42 @@ export const LoginPage = ({ onBack, onNavigateSignup, onLoginSuccess }: LoginPag
   });
 
   const onSubmit = async (data: LoginFormValues) => {
+    if (!isLoaded) return;
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: data.email,
+      const result = await signIn.create({
+        identifier: data.email,
         password: data.password,
       });
 
-      if (error) throw error;
-
-      toast.success(`Welcome back!`);
-      // Add a slight delay to show the toast before transition
-      setTimeout(() => {
-        onLoginSuccess(data.email);
-      }, 500);
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+        toast.success(`Welcome back!`);
+        // Add a slight delay to show the toast before transition
+        setTimeout(() => {
+          onLoginSuccess(data.email);
+        }, 500);
+      } else {
+        throw new Error("Additional authentication steps are required.");
+      }
     } catch (error: any) {
-      toast.error(error.message || "Invalid credentials");
+      toast.error(error.message || error.errors?.[0]?.message || "Invalid credentials");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleOAuthLogin = async (provider: 'oauth_google' | 'oauth_microsoft' | 'oauth_linkedin_oidc') => {
+    if (!isLoaded) return;
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          // Redirect back to your app after Google login
-          redirectTo: `${window.location.origin}/dashboard`,
-          // OR use window.location.origin if you want to handle routing in App.tsx
-        },
+      await signIn.authenticateWithRedirect({
+        strategy: provider,
+        redirectUrl: '/sso-callback',
+        redirectUrlComplete: '/dashboard',
       });
-      if (error) throw error;
     } catch (error: any) {
-      toast.error(error.message || "Could not sign in with Google");
+      toast.error(error.message || error.errors?.[0]?.message || `Could not sign in with ${provider}`);
       setIsLoading(false);
     }
   };
@@ -152,6 +154,8 @@ export const LoginPage = ({ onBack, onNavigateSignup, onLoginSuccess }: LoginPag
               <a href="#" className="text-sm font-medium text-black hover:underline">Forgot password?</a>
             </div>
 
+            <div id="clerk-captcha" />
+
             <motion.button
               whileTap={{ scale: 0.95 }}
               type="submit"
@@ -171,15 +175,52 @@ export const LoginPage = ({ onBack, onNavigateSignup, onLoginSuccess }: LoginPag
             </div>
           </div>
 
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={handleGoogleLogin}
-            disabled={isLoading}
-            className="w-full bg-white border border-gray-200 text-black h-12 rounded-full font-medium text-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
-            Sign in with Google
-          </motion.button>
+          <div className="grid grid-cols-3 gap-3">
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => handleOAuthLogin('oauth_google')}
+              disabled={isLoading}
+              type="button"
+              className="bg-white border border-gray-200 text-black h-12 rounded-full font-medium text-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              title="Sign in with Google"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+              </svg>
+            </motion.button>
+
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => handleOAuthLogin('oauth_microsoft')}
+              disabled={isLoading}
+              type="button"
+              className="bg-white border border-gray-200 text-black h-12 rounded-full font-medium text-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              title="Sign in with Microsoft"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 23 23">
+                <rect x="0" y="0" width="11" height="11" fill="#F25022"/>
+                <rect x="12" y="0" width="11" height="11" fill="#7FBA00"/>
+                <rect x="0" y="12" width="11" height="11" fill="#00A4EF"/>
+                <rect x="12" y="12" width="11" height="11" fill="#FFB900"/>
+              </svg>
+            </motion.button>
+
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => handleOAuthLogin('oauth_linkedin_oidc')}
+              disabled={isLoading}
+              type="button"
+              className="bg-white border border-gray-200 text-black h-12 rounded-full font-medium text-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              title="Sign in with LinkedIn"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#0A66C2" d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.779-1.75-1.75s.784-1.75 1.75-1.75 1.75.779 1.75 1.75-.784 1.75-1.75 1.75zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+              </svg>
+            </motion.button>
+          </div>
 
           <p className="mt-8 text-center text-sm text-gray-500">
             Don't have an account? <button onClick={onNavigateSignup} className="text-black font-medium hover:underline">Sign up for free</button>

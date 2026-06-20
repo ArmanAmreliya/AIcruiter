@@ -5,15 +5,16 @@ import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
 import { useAiCruiter } from '../../hooks/use-aicruiter';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { useClerk } from '@clerk/nextjs';
 
 export const Sidebar = () => {
   const { theme } = useTheme();
   const { user } = useAiCruiter();
+  const { signOut } = useClerk();
 
   const handleSignOut = async (e: React.MouseEvent) => {
     e.preventDefault();
-    await supabase.auth.signOut();
+    await signOut();
     window.location.href = '/login';
   };
 

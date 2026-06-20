@@ -18,3 +18,4 @@ export const ClientProviders = ({ children }: { children: React.ReactNode }) => 
     </ApolloProvider>
   );
 };
+

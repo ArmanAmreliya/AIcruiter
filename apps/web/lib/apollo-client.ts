@@ -6,26 +6,19 @@ const httpLink = createHttpLink({
 });
 
 const authLink = setContext(async (_, { headers }) => {
-  let userId = headers?.['x-user-id'] || headers?.['X-User-Id'] || '';
-  if (!userId && typeof window !== 'undefined') {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.endsWith('-auth-token')) {
-        try {
-          const session = JSON.parse(localStorage.getItem(key) || '{}');
-          userId = session?.user?.id || '';
-          if (userId) break;
-        } catch (e) {
-          console.error(e);
-        }
-      }
+  let token = '';
+  if (typeof window !== 'undefined' && (window as any).Clerk) {
+    try {
+      token = await (window as any).Clerk.session?.getToken() || '';
+    } catch (e) {
+      console.error("Failed to get Clerk token:", e);
     }
   }
 
   return {
     headers: {
       ...headers,
-      ...(userId ? { 'x-user-id': userId } : {})
+      ...(token ? { authorization: `Bearer ${token}` } : {})
     }
   };
 });
