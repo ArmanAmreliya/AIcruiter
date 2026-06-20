@@ -187,7 +187,7 @@ export const SignupPage = ({ onBack, onNavigateLogin }: SignupPageProps) => {
           className="w-full max-w-md mx-auto"
         >
           <div className="flex items-center gap-3 mb-8">
-            <LoadingLogo size={40} loading={false} />
+            <img src="https://img.icons8.com/forma-thin/96/7950F2/bot.png" alt="AIcruiter Logo" className="w-10 h-10" />
             <span className="text-xl font-bold tracking-tight text-black">AIcruiter</span>
           </div>
 

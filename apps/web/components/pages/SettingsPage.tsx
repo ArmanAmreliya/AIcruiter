@@ -44,7 +44,7 @@ const ProfileSettings = ({
         <div className="space-y-6 animate-fade-in-up">
             <div className="flex items-center gap-6">
                 <div className="relative group cursor-pointer">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-3xl font-bold text-white ring-4 ring-white dark:ring-zinc-800">
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#7950F2] to-fuchsia-600 flex items-center justify-center text-3xl font-bold text-white ring-4 ring-white dark:ring-zinc-800">
                         {getInitials(fullName || 'Recruiter')}
                     </div>
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
@@ -219,7 +219,7 @@ const NotificationSettings = ({
                 onClick={() => onChange(!checked)}
                 className={cn(
                     "w-12 h-7 rounded-full transition-colors relative",
-                    checked ? "bg-purple-600" : (theme === 'light' ? "bg-gray-200" : "bg-zinc-700")
+                    checked ? "bg-[#7950F2]" : (theme === 'light' ? "bg-gray-200" : "bg-zinc-700")
                 )}
             >
                 <div className={cn(
@@ -412,7 +412,7 @@ export const SettingsPage = () => {
                             className={cn(
                                 "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
                                 activeTab === tab.id
-                                    ? (theme === 'light' ? "bg-black text-white shadow-lg" : "bg-white text-black shadow-lg")
+                                    ? "bg-[#7950F2] text-white shadow-lg shadow-purple-500/20"
                                     : (theme === 'light' ? "bg-transparent text-gray-500 hover:bg-gray-100" : "bg-transparent text-gray-400 hover:bg-white/5")
                             )}
                         >
@@ -434,7 +434,7 @@ export const SettingsPage = () => {
                         <button
                             onClick={handleSave}
                             disabled={isSaving}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium text-sm transition-colors shadow-md shadow-green-500/20 disabled:opacity-50"
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#7950F2] hover:bg-[#633fd4] text-white font-medium text-sm transition-colors shadow-md shadow-purple-500/20 disabled:opacity-50"
                         >
                             {isSaving ? (
                                 <Loader2 size={16} className="animate-spin" />
@@ -480,7 +480,7 @@ export const SettingsPage = () => {
                                 <p className={cn("text-sm max-w-xs mx-auto", theme === 'light' ? "text-gray-500" : "text-gray-400")}>
                                     Manage your subscription and payment methods securely via Stripe.
                                 </p>
-                                <button className="mt-6 px-6 py-2 rounded-full border border-purple-500 text-purple-500 font-medium hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">
+                                <button className="mt-6 px-6 py-2 rounded-full border border-[#7950F2] text-[#7950F2] font-medium hover:bg-[#7950F2]/5 dark:hover:bg-[#7950F2]/10 transition-colors">
                                     Manage Subscription
                                 </button>
                             </div>

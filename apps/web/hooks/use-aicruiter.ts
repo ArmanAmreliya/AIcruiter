@@ -280,8 +280,18 @@ export const useAiCruiter = () => {
     }
   };
 
+  const fallbackUser = useMemo(() => {
+    if (!clerkUser) return DEFAULT_USER;
+    return {
+      ...DEFAULT_USER,
+      id: clerkUser.id,
+      name: clerkUser.fullName || `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || 'Recruiter',
+      email: clerkUser.primaryEmailAddress?.emailAddress || '',
+    };
+  }, [clerkUser]);
+
   return {
-    user: user || DEFAULT_USER,
+    user: user || fallbackUser,
     jobs,
     recentActivity,
     candidates,

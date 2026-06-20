@@ -7,18 +7,21 @@ const httpLink = createHttpLink({
 
 const authLink = setContext(async (_, { headers }) => {
   let token = '';
+  let userId = '';
   if (typeof window !== 'undefined' && (window as any).Clerk) {
     try {
       token = await (window as any).Clerk.session?.getToken() || '';
+      userId = (window as any).Clerk.user?.id || '';
     } catch (e) {
-      console.error("Failed to get Clerk token:", e);
+      console.error("Failed to get Clerk token/user:", e);
     }
   }
 
   return {
     headers: {
       ...headers,
-      ...(token ? { authorization: `Bearer ${token}` } : {})
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(userId ? { 'x-user-id': userId } : {})
     }
   };
 });

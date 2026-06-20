@@ -63,7 +63,7 @@ export const Sidebar = () => {
             className={({ isActive }) => cn(
               "flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group relative",
               isActive
-                ? "bg-[#6D28D9] text-white shadow-lg shadow-purple-500/20"
+                ? "bg-[#7950F2] text-white shadow-lg shadow-purple-500/20"
                 : theme === 'light'
                   ? "text-gray-500 hover:bg-black/5 hover:text-black"
                   : "text-gray-400 hover:bg-white/10 hover:text-white"
@@ -81,7 +81,7 @@ export const Sidebar = () => {
           "p-3 rounded-xl flex items-center gap-3 mb-3",
           theme === 'light' ? "bg-gray-50 border border-gray-100" : "bg-white/5 border border-white/5"
         )}>
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-xs ring-2 ring-white dark:ring-black">
+          <div className="w-9 h-9 rounded-full bg-[#7950F2] flex items-center justify-center text-white font-bold text-xs ring-2 ring-white dark:ring-black">
             {user?.name?.charAt(0) || 'U'}
           </div>
           <div className="flex-1 min-w-0">

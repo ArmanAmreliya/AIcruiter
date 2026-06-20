@@ -58,7 +58,7 @@ export const InterviewSimulationPage = () => {
 
         const updateMeter = () => {
           if (!analyser || !dataArray) return;
-          analyser.getByteFrequencyData(dataArray);
+          analyser.getByteFrequencyData(dataArray as any);
           const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
           setMicLevel(Math.min(100, (average / 128) * 100)); // Normalize roughly
           animationFrame = requestAnimationFrame(updateMeter);
@@ -243,7 +243,7 @@ export const InterviewSimulationPage = () => {
               <button
                 onClick={handleJoin}
                 disabled={!!error || !stream}
-                className="flex-1 px-10 py-4 bg-[#6D28D9] text-white rounded-full font-bold text-lg hover:bg-[#5b21b6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20"
+                className="flex-1 px-10 py-4 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 text-white rounded-full font-bold text-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 duration-100"
               >
                 Join Interview
               </button>
@@ -327,7 +327,7 @@ export const InterviewSimulationPage = () => {
                 {aiState === 'THINKING' ? (
                   <LoadingLogo size={80} />
                 ) : (
-                  <div className="w-full h-full rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 opacity-90" />
+                  <div className="w-full h-full rounded-full bg-gradient-to-tr from-purple-600 to-fuchsia-500 opacity-90" />
                 )}
               </motion.div>
             </div>

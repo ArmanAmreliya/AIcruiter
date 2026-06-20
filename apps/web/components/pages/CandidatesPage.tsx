@@ -25,7 +25,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { cn } from '../../lib/utils';
 import { PageLoader } from '../ui/PageLoader';
 import { toast } from 'sonner';
-import { supabase } from '../../lib/supabase';
+import { useUser } from '@clerk/nextjs';
 import { Link } from 'react-router-dom';
 import { apolloClient } from '../../lib/apollo-client';
 import { GET_CANDIDATES, UPDATE_CANDIDATE_STATUS } from '../../lib/graphql-queries';
@@ -83,6 +83,7 @@ const formatDate = (dateInput?: any) => {
 
 export const CandidatesPage = () => {
   const { theme } = useTheme();
+  const { user: clerkUser } = useUser();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,13 +94,12 @@ export const CandidatesPage = () => {
   const fetchCandidates = async () => {
     setLoading(true);
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
       const { data } = await apolloClient.query<any>({
         query: GET_CANDIDATES,
         fetchPolicy: 'network-only',
         context: {
           headers: {
-            'x-user-id': authUser?.id || '',
+            'x-user-id': clerkUser?.id || '',
           }
         }
       });

@@ -47,7 +47,7 @@ export const MediaPreview = ({ stream, isMuted, onToggleMute, error }: MediaPrev
     const updateLevel = () => {
       if (!analyserRef.current) return;
       
-      analyserRef.current.getByteFrequencyData(dataArray);
+      analyserRef.current.getByteFrequencyData(dataArray as any);
       
       // Calculate average volume
       let sum = 0;
