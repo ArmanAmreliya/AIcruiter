@@ -26,12 +26,36 @@ const DEFAULT_USER: User = {
 
 export const useAiCruiter = () => {
   const router = useRouter();
-  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+  const { user: realClerkUser, isLoaded: realClerkLoaded } = useUser();
+  
+  const isDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+  // IMPORTANT: useMemo prevents a new object being created on every render.
+  // Without this, the useEffect below would fire on every render (infinite loop)
+  // because a new {} literal is never reference-equal to the previous one.
+  const clerkUser = useMemo(() => {
+    if (realClerkUser) return realClerkUser;
+    if (isDev) return {
+      id: 'demo-recruiter-id-123',
+      fullName: 'Demo Recruiter',
+      firstName: 'Demo',
+      lastName: 'Recruiter',
+      primaryEmailAddress: { emailAddress: 'recruiter@example.com' }
+    } as any;
+    return null;
+  }, [realClerkUser, isDev]);
+
+  const clerkLoaded = realClerkLoaded || isDev;
+  const [isMounted, setIsMounted] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
   const [candidates, setCandidates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // 1. Fetch Data from GraphQL
   const fetchJobById = async (jobId: string) => {
@@ -290,8 +314,13 @@ export const useAiCruiter = () => {
     };
   }, [clerkUser]);
 
+  const resolvedUser = useMemo(() => {
+    if (!isMounted) return DEFAULT_USER;
+    return user || fallbackUser;
+  }, [isMounted, user, fallbackUser]);
+
   return {
-    user: user || fallbackUser,
+    user: resolvedUser,
     jobs,
     recentActivity,
     candidates,

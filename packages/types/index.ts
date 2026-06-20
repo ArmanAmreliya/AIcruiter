@@ -12,7 +12,7 @@ export type OnboardingData = z.infer<typeof onboardingSchema>;
 export const jobCreationSchema = z.object({
   title: z.string().min(2, "Job title is required"),
   jobRole: z.string().min(2, "Job role description is required"),
-  durationMinutes: z.number().int().min(5).max(60).default(15),
+  durationMinutes: z.number().int().min(1).max(1440).default(15),
   interviewType: z.array(z.string()).min(1, "At least one interview type is required"),
   experienceLevel: z.string().min(1, "Experience level is required"),
 });

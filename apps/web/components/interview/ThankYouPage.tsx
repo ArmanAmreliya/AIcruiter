@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Star, MessageSquare, ArrowRight, Heart, Home } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from '../../lib/react-router-dom-compat';
 import { useTheme } from '../../context/ThemeContext';
 import { cn } from '../../lib/utils';
 import { toast } from 'sonner';
@@ -18,8 +18,13 @@ export const ThankYouPage = () => {
         setTheme('light');
     }, [setTheme]);
 
-    const candidateId = location.state?.candidateId;
-    const jobId = location.state?.jobId;
+    const [searchParams] = useSearchParams();
+    const candidateId = searchParams.get('candidateId') || location.state?.candidateId;
+    const jobId = searchParams.get('jobId') || location.state?.jobId;
+    const exitType = searchParams.get('exitType') || location.state?.meta_data?.exit_type || 'AUTOMATIC';
+    const timeSpent = searchParams.get('timeSpent') 
+        ? parseInt(searchParams.get('timeSpent') || '0', 10) 
+        : location.state?.meta_data?.time_spent || 0;
 
     // Automatically mark the candidate interview as COMPLETED on mount
     useEffect(() => {
@@ -27,7 +32,8 @@ export const ThankYouPage = () => {
             if (candidateId) {
                 try {
                     const meta = {
-                        ...(location.state?.meta_data || {}),
+                        exit_type: exitType,
+                        time_spent: timeSpent,
                         completed_at: new Date().toISOString()
                     };
                     await apolloClient.mutate({
@@ -45,7 +51,7 @@ export const ThankYouPage = () => {
             }
         };
         markInterviewCompleted();
-    }, [candidateId]);
+    }, [candidateId, exitType, timeSpent]);
 
     const [rating, setRating] = useState(0);
     const [feedback, setFeedback] = useState('');
@@ -63,7 +69,8 @@ export const ThankYouPage = () => {
             // Update candidate status to COMPLETED and save feedback via GraphQL
             if (candidateId) {
                 const meta = {
-                    ...(location.state?.meta_data || {}),
+                    exit_type: exitType,
+                    time_spent: timeSpent,
                     rating,
                     candidateFeedback: feedback,
                     completed_at: new Date().toISOString()

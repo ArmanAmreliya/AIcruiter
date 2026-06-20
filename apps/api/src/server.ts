@@ -21,13 +21,12 @@ async function ensureUser(userId: string) {
   try {
     let user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      let email = 'recruiter@example.com';
+      const isDemo = userId === 'demo-recruiter-id-123';
+      let email = isDemo ? 'recruiter@example.com' : `${userId}@placeholder.aicruiter.com`;
       let fullName = 'Demo Recruiter';
       let companyName = 'AIcruiter Inc.';
       let role = 'Lead Recruiter';
       let onboarded = true;
-
-      const isDemo = userId === 'demo-recruiter-id-123';
 
       if (!isDemo) {
         onboarded = false;
@@ -43,6 +42,17 @@ async function ensureUser(userId: string) {
           } catch (err) {
             console.warn(`Could not query Clerk users for ${userId}:`, err);
           }
+        }
+      }
+
+      // Resolve email duplicate conflicts to prevent unique constraint violations
+      const existingUserByEmail = await prisma.user.findUnique({ where: { email } });
+      if (existingUserByEmail && existingUserByEmail.id !== userId) {
+        const parts = email.split('@');
+        if (parts.length === 2) {
+          email = `${parts[0]}+${userId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8)}@${parts[1]}`;
+        } else {
+          email = `${email}_${userId}`;
         }
       }
 
@@ -80,7 +90,7 @@ async function ensureUser(userId: string) {
     return user;
   } catch (error) {
     console.error(`Failed to ensure user ${userId}:`, error);
-    return null;
+    throw error;
   }
 }
 

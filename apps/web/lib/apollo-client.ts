@@ -17,11 +17,14 @@ const authLink = setContext(async (_, { headers }) => {
     }
   }
 
+  const isDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const fallbackUserId = isDev ? 'demo-recruiter-id-123' : '';
+
   return {
     headers: {
       ...headers,
       ...(token ? { authorization: `Bearer ${token}` } : {}),
-      ...(userId ? { 'x-user-id': userId } : {})
+      'x-user-id': userId || fallbackUserId || 'demo-recruiter-id-123'
     }
   };
 });

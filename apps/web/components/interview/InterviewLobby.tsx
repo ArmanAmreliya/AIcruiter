@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom'; // Assuming react-router-dom is used
+import { useParams, useNavigate } from '../../lib/react-router-dom-compat';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     CheckCircle2,

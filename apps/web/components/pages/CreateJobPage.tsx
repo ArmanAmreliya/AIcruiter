@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Sparkles, Loader2, ArrowRight, Check, Copy, LayoutDashboard, Clock, Tag, Briefcase, FileText, User, Award, Brain, BookOpen, ListChecks } from 'lucide-react';
 import { useAiCruiter } from '../../hooks/use-aicruiter';
 import { useTheme } from '../../context/ThemeContext';
-import { useLocation } from 'react-router-dom';
+import { useSearchParams } from 'next/navigation';
 import { cn, parseJobDescription, serializeJobDescription } from '../../lib/utils';
 import { toast } from 'sonner';
 
@@ -39,18 +39,19 @@ const SUGGESTED_SKILLS = ['React', 'System Design', 'TypeScript', 'Node.js', 'SQ
 
 export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
   const { theme } = useTheme();
-  const location = useLocation();
+  const searchParams = useSearchParams();
   const { createJob, updateJob, fetchJobById } = useAiCruiter();
 
   // URL Params for Edit Mode
-  const queryParams = new URLSearchParams(location.search);
-  const editId = queryParams.get('edit');
+  const editId = searchParams?.get('edit') ?? null;
   const isEditMode = !!editId;
 
   // Form State
   const [jobPosition, setJobPosition] = useState('');
   const [description, setDescription] = useState('');
-  const [duration, setDuration] = useState(15);
+  const [durationValue, setDurationValue] = useState(15);
+  const [durationUnit, setDurationUnit] = useState<'minutes' | 'hours'>('minutes');
+  const duration = durationUnit === 'hours' ? durationValue * 60 : durationValue;
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['Technical']);
   
   // Custom Interview settings
@@ -78,7 +79,14 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
           setFocusAreas(parsedMeta.focusAreas);
           setPersona(parsedMeta.persona);
 
-          setDuration(job.durationMinutes || job.duration_minutes || 15);
+          const mins = job.durationMinutes || job.duration_minutes || 15;
+          if (mins >= 60 && mins % 60 === 0) {
+            setDurationValue(mins / 60);
+            setDurationUnit('hours');
+          } else {
+            setDurationValue(mins);
+            setDurationUnit('minutes');
+          }
           setSelectedTypes(job.interviewType || job.interview_type || ['Technical']);
           setExperienceLevel(job.experienceLevel || 'Mid-Level');
         }
@@ -165,7 +173,8 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
     setJobPosition('');
     setDescription('');
     setSelectedTypes(['Technical']);
-    setDuration(15);
+    setDurationValue(15);
+    setDurationUnit('minutes');
     setExperienceLevel('Mid-Level');
     setGuidelines('');
     setFocusAreas('');
@@ -482,52 +491,91 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
                   <Clock size={16} className="text-purple-500" />
                   Interview Duration
                 </label>
-                <div className="relative">
-                  <select
-                    value={duration}
-                    onChange={(e) => setDuration(Number(e.target.value))}
-                    className={cn(
-                      "w-full px-4 py-3 rounded-xl border outline-none transition-all text-base appearance-none cursor-pointer",
-                      theme === 'light'
-                        ? "bg-white border-gray-200 focus:border-purple-500 text-gray-900"
-                        : "bg-black/40 border-zinc-700 focus:border-purple-500 text-white"
-                    )}
-                    disabled={isSubmitting}
-                  >
-                    {DURATIONS.map(d => (
-                      <option key={d} value={d}>{d} minutes</option>
-                    ))}
-                  </select>
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
-                    <Clock size={16} />
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      min={1}
+                      value={durationValue}
+                      onChange={(e) => setDurationValue(Math.max(1, Number(e.target.value)))}
+                      className={cn(
+                        "w-full px-4 py-3 rounded-xl border outline-none transition-all text-base",
+                        theme === 'light'
+                          ? "bg-white border-gray-200 focus:border-purple-500 text-gray-900"
+                          : "bg-black/40 border-zinc-700 focus:border-purple-500 text-white"
+                      )}
+                      placeholder="Duration"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="w-[150px] relative">
+                    <select
+                      value={durationUnit}
+                      onChange={(e) => setDurationUnit(e.target.value as 'minutes' | 'hours')}
+                      className={cn(
+                        "w-full px-4 py-3 rounded-xl border outline-none transition-all text-base appearance-none cursor-pointer pr-10",
+                        theme === 'light'
+                          ? "bg-white border-gray-200 focus:border-purple-500 text-gray-900"
+                          : "bg-black/40 border-zinc-700 focus:border-purple-500 text-white"
+                      )}
+                      disabled={isSubmitting}
+                    >
+                      <option value="minutes">Minutes</option>
+                      <option value="hours">Hours</option>
+                    </select>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
+                      <Clock size={16} />
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Visual Breakdown Timeline */}
-              <div className={cn(
-                "p-4 rounded-xl border text-xs space-y-3",
-                theme === 'light' ? "bg-purple-50/20 border-purple-100 text-gray-600" : "bg-black/20 border-zinc-800 text-zinc-400"
-              )}>
-                <div className="font-bold flex items-center gap-2 text-purple-700 dark:text-purple-300">
-                  <ListChecks size={14} />
-                  Interview Session Timeline Breakdown ({duration} minutes)
-                </div>
-                <div className="relative pl-4 border-l border-purple-200 dark:border-purple-900/50 space-y-3">
-                  <div className="relative">
-                    <div className="absolute -left-[20.5px] top-0.5 w-2 h-2 rounded-full bg-purple-500" />
-                    <span className="font-bold text-gray-800 dark:text-gray-300">Start (0:00 - 3:00):</span> Introduction by {persona}, Candidate icebreaker, and verification.
+              {(() => {
+                const durationSeconds = duration * 60;
+                const formatTime = (secs: number) => {
+                  const mins = Math.floor(secs / 60);
+                  const s = Math.floor(secs % 60);
+                  return `${mins}:${s < 10 ? '0' : ''}${s}`;
+                };
+
+                let coreStartSec = 180;
+                let coreEndSec = durationSeconds - 180;
+
+                if (duration < 5) {
+                  coreStartSec = Math.round(durationSeconds * 0.25);
+                  coreEndSec = Math.round(durationSeconds * 0.75);
+                } else if (duration < 10) {
+                  coreStartSec = 60;
+                  coreEndSec = durationSeconds - 60;
+                }
+
+                return (
+                  <div className={cn(
+                    "p-4 rounded-xl border text-xs space-y-3",
+                    theme === 'light' ? "bg-purple-50/20 border-purple-100 text-gray-600" : "bg-black/20 border-zinc-800 text-zinc-400"
+                  )}>
+                    <div className="font-bold flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                      <ListChecks size={14} />
+                      Interview Session Timeline Breakdown ({duration} {duration === 1 ? 'minute' : 'minutes'})
+                    </div>
+                    <div className="relative pl-4 border-l border-purple-200 dark:border-purple-900/50 space-y-3">
+                      <div className="relative">
+                        <div className="absolute -left-[20.5px] top-0.5 w-2 h-2 rounded-full bg-purple-500" />
+                        <span className="font-bold text-gray-800 dark:text-gray-300">Start (0:00 - {formatTime(coreStartSec)}):</span> Introduction by {persona}, Candidate icebreaker, and verification.
+                      </div>
+                      <div className="relative">
+                        <div className="absolute -left-[20.5px] top-0.5 w-2 h-2 rounded-full bg-purple-500" />
+                        <span className="font-bold text-gray-800 dark:text-gray-300">Core Assessment ({formatTime(coreStartSec)} - {formatTime(coreEndSec)}):</span> Screening on key skills ({focusAreas || 'relevant job skills'}) adapted to {experienceLevel} seniority.
+                      </div>
+                      <div className="relative">
+                        <div className="absolute -left-[20.5px] top-0.5 w-2 h-2 rounded-full bg-purple-500" />
+                        <span className="font-bold text-gray-800 dark:text-gray-300">Wrap-up ({formatTime(coreEndSec)} - {formatTime(durationSeconds)}):</span> Candidate Q&A, feedback registration, and session closing.
+                      </div>
+                    </div>
                   </div>
-                  <div className="relative">
-                    <div className="absolute -left-[20.5px] top-0.5 w-2 h-2 rounded-full bg-purple-500" />
-                    <span className="font-bold text-gray-800 dark:text-gray-300">Core Assessment (3:00 - {duration - 3}:00):</span> Screening on key skills ({focusAreas || 'relevant job skills'}) adapted to {experienceLevel} seniority.
-                  </div>
-                  <div className="relative">
-                    <div className="absolute -left-[20.5px] top-0.5 w-2 h-2 rounded-full bg-purple-500" />
-                    <span className="font-bold text-gray-800 dark:text-gray-300">Wrap-up ({duration - 3}:00 - {duration}:00):</span> Candidate Q&A, feedback registration, and session closing.
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
 
             {/* Interview Types (Chips) */}

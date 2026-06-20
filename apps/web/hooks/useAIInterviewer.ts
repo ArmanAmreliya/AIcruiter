@@ -148,7 +148,9 @@ ${promptDetails}
 * Speak directly, clearly, and naturally. Use short sentences and contractions (e.g. "I'm", "Let's").
 * Sound calm, confident, and encouraging, like a thoughtful recruiter guiding a strong conversation.
 * Use conversational fillers occasionally (e.g. "Hmm, I see", "Interesting", "That makes sense") to show active listening.
-* Avoid robotic phrasing or giving long monologues.`;
+* **DO NOT summarize, repeat, or explain back the candidate's answer.** Real interviewers do not play back or analyze what the candidate just said; they acknowledge it briefly and transition immediately to the next question.
+* **DO NOT lecture or give monologues.** Get straight to your next question or follow-up.
+* **Keep responses extremely brief (maximum 2-3 sentences).** Focus on asking a single clear follow-up or next question.`;
 
         const messages = [
             { role: 'system' as const, content: systemPrompt },
@@ -224,6 +226,103 @@ ${promptDetails}
         }
     };
 
+    // --- STT Message Handling & Silence Debouncing ---
+    const handleDeepgramMessage = (event: MessageEvent) => {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'KeepAlive') return;
+
+            const alternative = data.channel?.alternatives?.[0];
+            const segmentText = alternative?.transcript || '';
+
+            if (segmentText) {
+                if (isSpeakingRef.current) {
+                    logTrace("Ignoring assistant audio bleed while Sarah is speaking.");
+                    return;
+                }
+
+                // If user is actively speaking, clear the submission silence timer immediately
+                if (silenceTimerRef.current) {
+                    clearTimeout(silenceTimerRef.current);
+                    silenceTimerRef.current = null;
+                }
+
+                if (data.is_final) {
+                    accumulatedTranscriptRef.current += (accumulatedTranscriptRef.current ? ' ' : '') + segmentText;
+                    setTranscript(accumulatedTranscriptRef.current);
+                } else {
+                    const interimDisplay = accumulatedTranscriptRef.current 
+                        ? `${accumulatedTranscriptRef.current} ${segmentText}...` 
+                        : `${segmentText}...`;
+                    setTranscript(interimDisplay);
+                }
+
+                // Consolidate response triggering using a debounced silence timer of 3500ms
+                if (accumulatedTranscriptRef.current.trim() && !isSpeakingRef.current) {
+                    silenceTimerRef.current = setTimeout(() => {
+                        const finalUtterance = accumulatedTranscriptRef.current.trim();
+                        if (finalUtterance) {
+                            logTrace(`Silence threshold reached (3500ms). Submitting candidate answer: "${finalUtterance}"`);
+                            accumulatedTranscriptRef.current = '';
+                            generateResponse(finalUtterance);
+                        }
+                    }, 3500);
+                }
+            }
+        } catch (e: any) {
+            logTrace(`ERROR parsing WebSocket stream text: ${e.message || e}`);
+        }
+    };
+
+    // Reconnect Deepgram WebSocket
+    const reconnectDeepgram = async () => {
+        if (deepgramLiveRef.current && (deepgramLiveRef.current.readyState === WebSocket.OPEN || deepgramLiveRef.current.readyState === WebSocket.CONNECTING)) {
+            return;
+        }
+
+        logTrace("Connecting STT WebSocket to Deepgram...");
+        try {
+            const { data } = await apolloClient.mutate<any>({
+                mutation: GET_DEEPGRAM_TOKEN
+            });
+            const token = data?.getDeepgramToken;
+            if (!token) throw new Error("Could not fetch Deepgram token");
+
+            const wsUrl = `wss://api.deepgram.com/v1/listen?model=nova-2&interim_results=true&smart_format=true&filler_words=true&endpointing=2000`;
+            const ws = new WebSocket(wsUrl, ['token', token]);
+            deepgramLiveRef.current = ws;
+
+            ws.onopen = () => {
+                logTrace("STT WebSocket connected successfully.");
+                if (keepAliveTimerRef.current) clearInterval(keepAliveTimerRef.current);
+                keepAliveTimerRef.current = setInterval(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'KeepAlive' }));
+                        logTrace("STT KeepAlive heartbeat sent.");
+                    }
+                }, 5000);
+            };
+
+            ws.onmessage = (event) => {
+                handleDeepgramMessage(event);
+            };
+
+            ws.onerror = (error) => {
+                logTrace("STT WebSocket error encountered.");
+            };
+
+            ws.onclose = (event) => {
+                logTrace(`STT WebSocket closed. Code: ${event.code}, Reason: ${event.reason || 'None'}`);
+                if (keepAliveTimerRef.current) {
+                    clearInterval(keepAliveTimerRef.current);
+                    keepAliveTimerRef.current = null;
+                }
+            };
+        } catch (err: any) {
+            logTrace(`ERROR connecting STT WebSocket: ${err.message || err}`);
+        }
+    };
+
     // --- 3. Voice: Proxy TTS call through backend to bypass CORS using HTML5 Audio ---
     const speak = async (text: string) => {
         setStatus('SPEAKING');
@@ -276,7 +375,7 @@ ${promptDetails}
             const audio = new Audio(audioUrl);
             activeAudioRef.current = audio;
 
-            audio.onended = () => {
+            audio.onended = async () => {
                 logTrace("AI Audio speech track completed. Reverting to LISTENING status.");
                 if (activeAudioRef.current === audio) {
                     activeAudioRef.current = null;
@@ -284,6 +383,10 @@ ${promptDetails}
                 isSpeakingRef.current = false;
                 if (recorderWasActive && mediaRecorder) {
                     try {
+                        if (!deepgramLiveRef.current || deepgramLiveRef.current.readyState !== WebSocket.OPEN) {
+                            logTrace("STT WebSocket closed during TTS playback. Reconnecting...");
+                            await reconnectDeepgram();
+                        }
                         mediaRecorder.resume();
                         logTrace("Resumed mic capture after Sarah finished speaking.");
                     } catch (e) {
@@ -300,11 +403,90 @@ ${promptDetails}
             logTrace(`ERROR in TTS generation or playback: ${error.message || error}`);
             if (recorderWasActive && mediaRecorder) {
                 try {
+                    if (!deepgramLiveRef.current || deepgramLiveRef.current.readyState !== WebSocket.OPEN) {
+                        await reconnectDeepgram();
+                    }
                     mediaRecorder.resume();
                 } catch (e) {}
             }
             setStatus('LISTENING');
             isSpeakingRef.current = false;
+        }
+    };
+
+    const speakWrapUp = async (text: string, onEndedCallback: () => void) => {
+        setStatus('SPEAKING');
+        isSpeakingRef.current = true;
+        
+        // Append message to history list so it displays in UI
+        const nextHistory: { role: 'user' | 'assistant', content: string }[] = [
+            ...historyRef.current,
+            { role: 'assistant' as const, content: text }
+        ];
+        historyRef.current = nextHistory;
+        setHistory(nextHistory);
+
+        // Stop media capturing and WebSocket connection
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            try {
+                mediaRecorderRef.current.stop();
+                logTrace("Stopped media recorder for final wrap-up.");
+            } catch (e) {}
+        }
+        if (deepgramLiveRef.current && deepgramLiveRef.current.readyState === WebSocket.OPEN) {
+            try {
+                deepgramLiveRef.current.close();
+            } catch (e) {}
+        }
+
+        try {
+            const defaultUrl = 'http://localhost:4000';
+            let apiUrl = defaultUrl;
+            if (typeof window !== 'undefined') {
+                if ((window as any).NEXT_PUBLIC_API_URL) {
+                    apiUrl = (window as any).NEXT_PUBLIC_API_URL.replace('/graphql', '');
+                } else {
+                    apiUrl = `http://${window.location.hostname}:4000`;
+                }
+            } else if (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_API_URL) {
+                apiUrl = process.env.NEXT_PUBLIC_API_URL.replace('/graphql', '');
+            }
+
+            logTrace(`Requesting TTS for final wrap-up from local proxy: ${apiUrl}/api/speak`);
+            const response = await fetch(`${apiUrl}/api/speak`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text })
+            });
+
+            if (!response.ok) throw new Error(`TTS service returned status ${response.status}`);
+
+            const audioBlob = await response.blob();
+            const audioUrl = URL.createObjectURL(audioBlob);
+            
+            if (activeAudioRef.current) {
+                try {
+                    activeAudioRef.current.pause();
+                } catch (e) {}
+            }
+
+            const audio = new Audio(audioUrl);
+            activeAudioRef.current = audio;
+
+            audio.onended = () => {
+                logTrace("Final wrap-up speech completed. Invoking end callback.");
+                isSpeakingRef.current = false;
+                setStatus('IDLE');
+                onEndedCallback();
+            };
+
+            await audio.play();
+            logTrace("Final wrap-up playback started");
+        } catch (error: any) {
+            logTrace(`ERROR playing final wrap-up: ${error.message || error}`);
+            onEndedCallback();
         }
     };
 
@@ -325,107 +507,9 @@ ${promptDetails}
 
     // --- 4. Ears: Deepgram Nova-2 STT via Browser WebSocket & Temp Token ---
     const startListening = async (userStream?: MediaStream) => {
-        logTrace("Initial startInterview invoked. Generating Deepgram credential token...");
+        logTrace("Initial startInterview invoked. Connecting Deepgram WebSocket...");
         try {
-            // A. Get a short-lived Deepgram token from backend
-            const { data } = await apolloClient.mutate<any>({
-                mutation: GET_DEEPGRAM_TOKEN
-            });
-            const token = data?.getDeepgramToken;
-            if (!token) throw new Error("Could not fetch Deepgram token");
-            logTrace("Deepgram token obtained successfully from server resolver.");
-
-            // B. Connect directly to Deepgram WebSocket via native browser API with sub-protocol auth (endpointing=2000 for conversational comfort)
-            const wsUrl = `wss://api.deepgram.com/v1/listen?model=nova-2&interim_results=true&smart_format=true&filler_words=true&endpointing=2000`;
-            logTrace(`Establishing direct WebSocket to Deepgram: wss://api.deepgram.com/v1/listen...`);
-            const ws = new WebSocket(wsUrl, ['token', token]);
-            deepgramLiveRef.current = ws;
-
-            ws.onopen = () => {
-                logTrace("Deepgram STT WebSocket connected successfully.");
-                setStatus('LISTENING');
-
-                // Start KeepAlive heartbeat interval every 5 seconds to prevent Deepgram silent timeout
-                logTrace("Initializing 5s KeepAlive WebSocket heartbeat interval.");
-                if (keepAliveTimerRef.current) clearInterval(keepAliveTimerRef.current);
-                keepAliveTimerRef.current = setInterval(() => {
-                    if (ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({ type: 'KeepAlive' }));
-                        logTrace("STT KeepAlive heartbeat sent.");
-                    }
-                }, 5000);
-            };
-
-            ws.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    
-                    // Filter out keepalive return messages
-                    if (data.type === 'KeepAlive') return;
-
-                    const alternative = data.channel?.alternatives?.[0];
-                    const segmentText = alternative?.transcript || '';
-
-                    if (segmentText) {
-                        if (isSpeakingRef.current) {
-                            logTrace("Ignoring assistant audio bleed while Sarah is speaking.");
-                            return;
-                        }
-
-                        if (data.is_final) {
-                            accumulatedTranscriptRef.current += (accumulatedTranscriptRef.current ? ' ' : '') + segmentText;
-                            setTranscript(accumulatedTranscriptRef.current);
-
-                            // Fallback timer: trigger LLM if speech_final is delayed
-                            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-                            silenceTimerRef.current = setTimeout(() => {
-                                const fallbackUtterance = accumulatedTranscriptRef.current.trim();
-                                if (fallbackUtterance) {
-                                    logTrace(`Fallback silence timer expired (3000ms). Submitting: "${fallbackUtterance}"`);
-                                    accumulatedTranscriptRef.current = '';
-                                    generateResponse(fallbackUtterance);
-                                }
-                                }, 3000);
-                        } else {
-                            // Show accumulated finalized text plus current interim text for live responsive subtitle feel
-                            const interimDisplay = accumulatedTranscriptRef.current 
-                                ? `${accumulatedTranscriptRef.current} ${segmentText}...` 
-                                : `${segmentText}...`;
-                            setTranscript(interimDisplay);
-                        }
-                    }
-
-                    // Low-latency turn-taking trigger via Deepgram natural end of speech endpointing
-                    if (data.speech_final) {
-                        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-                        const finalUtterance = accumulatedTranscriptRef.current.trim();
-                        if (finalUtterance) {
-                            logTrace(`Natural speech final event received. Submitting candidate input: "${finalUtterance}"`);
-                            accumulatedTranscriptRef.current = '';
-                            generateResponse(finalUtterance);
-                        }
-                    }
-                } catch (e: any) {
-                    logTrace(`ERROR parsing WebSocket stream text: ${e.message || e}`);
-                }
-            };
-
-            ws.onerror = (error) => {
-                logTrace("ERROR: Deepgram STT WebSocket connection encountered an error.");
-                if (keepAliveTimerRef.current) {
-                    clearInterval(keepAliveTimerRef.current);
-                    keepAliveTimerRef.current = null;
-                }
-            };
-
-            ws.onclose = (event) => {
-                logTrace(`Deepgram STT WebSocket closed. Code: ${event.code}, Reason: ${event.reason || 'None provided'}`);
-                if (keepAliveTimerRef.current) {
-                    clearInterval(keepAliveTimerRef.current);
-                    keepAliveTimerRef.current = null;
-                }
-            };
-
+            await reconnectDeepgram();
             accumulatedTranscriptRef.current = '';
 
             // Use the passed in userStream if available; otherwise capture audio cross-browser compatible fallback options
@@ -458,9 +542,17 @@ ${promptDetails}
             const mediaRecorder = new MediaRecorder(audioStream, options);
             mediaRecorderRef.current = mediaRecorder;
 
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-                    ws.send(event.data);
+            mediaRecorder.ondataavailable = async (event) => {
+                if (event.data.size > 0) {
+                    if (!deepgramLiveRef.current || deepgramLiveRef.current.readyState !== WebSocket.OPEN) {
+                        if (deepgramLiveRef.current?.readyState !== WebSocket.CONNECTING) {
+                            logTrace("STT WebSocket closed during data transmission. Reconnecting...");
+                            await reconnectDeepgram();
+                        }
+                    }
+                    if (deepgramLiveRef.current && deepgramLiveRef.current.readyState === WebSocket.OPEN) {
+                        deepgramLiveRef.current.send(event.data);
+                    }
                 }
             };
 
@@ -498,6 +590,10 @@ ${promptDetails}
                 clearInterval(keepAliveTimerRef.current);
                 keepAliveTimerRef.current = null;
             }
+            if (silenceTimerRef.current) {
+                clearTimeout(silenceTimerRef.current);
+                silenceTimerRef.current = null;
+            }
             if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
                 mediaRecorderRef.current.stop();
             }
@@ -531,6 +627,7 @@ ${promptDetails}
         logs,
         isEnabled: !!mediaRecorderRef.current,
         startInterview: startListening,
+        speakWrapUp,
         toggleMic: () => {
             if (mediaRecorderRef.current?.state === 'recording') {
                 logTrace("Muting user microphone track (pausing MediaRecorder).");

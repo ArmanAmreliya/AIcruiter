@@ -29,9 +29,10 @@ export function useParams<T extends Record<string, string | string[]> = Record<s
 
 export function useLocation() {
   const pathname = usePathname();
+  const searchParams = useNextSearchParams();
   return {
     pathname: pathname || '',
-    search: '',
+    search: searchParams ? `?${searchParams.toString()}` : '',
     hash: '',
     state: null as any,
   };

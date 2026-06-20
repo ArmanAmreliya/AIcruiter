@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from '../../lib/react-router-dom-compat';
 import { motion } from 'framer-motion';
 import { Mic, MicOff, PhoneOff, Video, VideoOff, Maximize2, ShieldCheck, Loader2, ArrowRight, Moon, Sun } from 'lucide-react';
 import { useAIInterviewer } from '../../hooks/useAIInterviewer';
@@ -32,6 +32,7 @@ export const InterviewRoom = () => {
     }, [jobId, location.state?.candidateId, location.state?.candidateName]);
 
     const videoRef = useRef<HTMLVideoElement>(null);
+    const transcriptEndRef = useRef<HTMLDivElement>(null);
     const [micActive, setMicActive] = useState(true);
     const [videoActive, setVideoActive] = useState(true);
 
@@ -84,13 +85,29 @@ export const InterviewRoom = () => {
         status,
         transcript,
         history,
-        startInterview
+        startInterview,
+        speakWrapUp
     } = useAIInterviewer(jobId!, candidateId, candidateName, jobTitle, companyName, jobDescription, experienceLevel);
+
+    // Auto-scroll transcript history container to the bottom on new dialogue or status updates
+    useEffect(() => {
+        if (transcriptEndRef.current) {
+            transcriptEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [history, status]);
+
+    const [hasStarted, setHasStarted] = useState(false);
+    const [cameraReady, setCameraReady] = useState(false);
+    const [isStartingInterview, setIsStartingInterview] = useState(false);
+    const [isEndingInterview, setIsEndingInterview] = useState(false);
+    const [wrapUpTriggered, setWrapUpTriggered] = useState(false);
 
     // --- Session Timer Effect ---
     useEffect(() => {
+        if (wrapUpTriggered) return; // Freeze timer ticks during wrap-up speech
+
         if (timeLeft <= 0) {
-            navigate('/interview/thank-you', { state: { candidateId, jobId } });
+            navigate(`/interview/thank-you?candidateId=${candidateId}&jobId=${jobId}&exitType=TIMEOUT&timeSpent=${sessionDuration}`);
             return;
         }
 
@@ -99,18 +116,35 @@ export const InterviewRoom = () => {
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [timeLeft, navigate, candidateId, jobId]);
+    }, [timeLeft, navigate, candidateId, jobId, wrapUpTriggered, sessionDuration]);
+
+    // --- Last Minute Wrap-up Trigger Effect ---
+    useEffect(() => {
+        if (hasStarted && timeLeft <= 60 && !wrapUpTriggered && !isEndingInterview) {
+            setWrapUpTriggered(true);
+            setIsEndingInterview(true);
+            const goodbyeText = `Thank you so much for your time today. That's all the time we have for this interview. We will review your responses and announce the results through email shortly. Have a great day!`;
+            
+            toast.info("Wrapping up the interview...");
+
+            // Set a fallback timeout (10s) in case speech playing fails or hangs
+            const redirectTimeout = setTimeout(() => {
+                console.warn("Speech wrap-up fallback redirect triggered.");
+                navigate(`/interview/thank-you?candidateId=${candidateId}&jobId=${jobId}&exitType=TIMEOUT&timeSpent=${sessionDuration - timeLeft}`);
+            }, 10000);
+
+            speakWrapUp(goodbyeText, () => {
+                clearTimeout(redirectTimeout);
+                navigate(`/interview/thank-you?candidateId=${candidateId}&jobId=${jobId}&exitType=TIMEOUT&timeSpent=${sessionDuration - timeLeft}`);
+            });
+        }
+    }, [timeLeft, hasStarted, wrapUpTriggered, isEndingInterview, candidateId, jobId, sessionDuration, speakWrapUp, navigate]);
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
-
-    const [hasStarted, setHasStarted] = useState(false);
-    const [cameraReady, setCameraReady] = useState(false);
-    const [isStartingInterview, setIsStartingInterview] = useState(false);
-    const [isEndingInterview, setIsEndingInterview] = useState(false);
     const localStreamRef = useRef<MediaStream | null>(null);
 
     // --- Initialize Camera (With audio-only fallback) ---
@@ -187,16 +221,7 @@ export const InterviewRoom = () => {
 
         if (window.confirm("Are you sure you want to end the interview? Your progress will be saved.")) {
             setIsEndingInterview(true);
-            navigate('/interview/thank-you', {
-                state: {
-                    candidateId,
-                    jobId,
-                    meta_data: {
-                        exit_type: 'MANUAL',
-                        time_spent: sessionDuration - timeLeft
-                    }
-                }
-            });
+            navigate(`/interview/thank-you?candidateId=${candidateId}&jobId=${jobId}&exitType=MANUAL&timeSpent=${sessionDuration - timeLeft}`);
             toast.success("Interview submitted successfully.");
         } else {
             setIsEndingInterview(false);
@@ -549,6 +574,7 @@ export const InterviewRoom = () => {
                             </div>
                         ))
                     )}
+                    <div ref={transcriptEndRef} />
                 </div>
                 </div>
             </div>

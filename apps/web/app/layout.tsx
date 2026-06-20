@@ -18,6 +18,8 @@ export default function RootLayout({
     <html lang="en" className="light" suppressHydrationWarning>
       <head>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+      </head>
+      <body className="min-h-screen bg-background text-foreground selection:bg-purple-500/30">
         <Script
           id="runtime-env"
           strategy="beforeInteractive"
@@ -28,8 +30,6 @@ export default function RootLayout({
             window.__NEXT_AI_API_KEY__ = ${JSON.stringify(process.env.NEXT_AI_API_KEY || process.env.VITE_AI_API_KEY || process.env.NEXT_GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY)};
           ` }}
         />
-      </head>
-      <body className="min-h-screen bg-background text-foreground selection:bg-purple-500/30">
         {/* @ts-expect-error Server Component */}
         <ClerkProvider>
           <ClientProviders>

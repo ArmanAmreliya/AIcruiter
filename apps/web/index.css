@@ -97,3 +97,32 @@ body {
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
+
+/* --- Premium Custom Scrollbars --- */
+/* Global Scrollbars */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(121, 80, 242, 0.4) transparent;
+}
+
+/* WebKit browsers (Chrome, Safari, Edge, Opera) */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: rgba(121, 80, 242, 0.4);
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    transition: background-color 0.2s ease-in-out;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(121, 80, 242, 0.8);
+}
