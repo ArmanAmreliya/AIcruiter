@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Sparkles, Loader2, ArrowRight, Check, Copy, LayoutDashboard, Clock, Tag, Briefcase, FileText, User, Award, Brain, BookOpen, ListChecks } from 'lucide-react';
+import { 
+  ArrowLeft, Sparkles, Loader2, ArrowRight, Check, Copy, 
+  LayoutDashboard, Clock, Tag, Briefcase, FileText, User, 
+  Award, Brain, BookOpen, ListChecks, Code2, UserCheck, 
+  BrainCircuit, Users, X, Plus 
+} from 'lucide-react';
 import { useAiCruiter } from '../../hooks/use-aicruiter';
 import { useTheme } from '../../context/ThemeContext';
 import { useSearchParams } from 'next/navigation';
@@ -13,11 +18,11 @@ interface CreateJobPageProps {
 }
 
 const INTERVIEW_TYPES = [
-  { id: 'Technical', icon: '< / >', label: 'Technical' },
-  { id: 'Behavioral', icon: '👤', label: 'Behavioral' },
-  { id: 'Experience', icon: '💼', label: 'Experience' },
-  { id: 'Problem Solving', icon: '🧩', label: 'Problem Solving' },
-  { id: 'Leadership', icon: '👥', label: 'Leadership' }
+  { id: 'Technical', icon: Code2, label: 'Technical' },
+  { id: 'Behavioral', icon: UserCheck, label: 'Behavioral' },
+  { id: 'Experience', icon: Briefcase, label: 'Experience' },
+  { id: 'Problem Solving', icon: BrainCircuit, label: 'Problem Solving' },
+  { id: 'Leadership', icon: Users, label: 'Leadership' }
 ];
 
 const DURATIONS = [15, 30, 45, 60];
@@ -35,7 +40,23 @@ const PERSONAS = [
   { id: 'Emma', name: 'Emma', role: 'Product Talent Partner', desc: 'Fast-paced & Conversational', tone: 'Collaborative agility, speed, communication, outcomes focus' }
 ];
 
-const SUGGESTED_SKILLS = ['React', 'System Design', 'TypeScript', 'Node.js', 'SQL', 'Algorithms', 'Testing', 'Behavioral', 'Communication', 'AWS'];
+const SUGGESTED_SKILLS = [
+  'React', 'React Native', 'Redux', 'Zustand', 'Next.js', 'Vite',
+  'TypeScript', 'JavaScript', 'HTML5', 'CSS3', 'TailwindCSS',
+  'Node.js', 'Express.js', 'NestJS', 'GraphQL', 'REST APIs',
+  'Python', 'Django', 'FastAPI', 'Go (Golang)', 'Rust',
+  'Java', 'Spring Boot', 'C#', '.NET', 'PHP', 'Laravel',
+  'SQL', 'PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'Cassandra',
+  'Prisma', 'Sequelize', 'Mongoose',
+  'System Design', 'Microservices', 'Serverless', 'Docker', 'Kubernetes',
+  'AWS', 'Google Cloud Platform (GCP)', 'Microsoft Azure', 'Vercel',
+  'CI/CD', 'GitHub Actions', 'Terraform', 'Prometheus', 'Grafana',
+  'Testing', 'Jest', 'Cypress', 'Playwright', 'Vitest',
+  'Product Management', 'Product Development', 'Product Strategy', 'Agile Methodology', 'Scrum',
+  'Project Management', 'Business Analysis', 'Marketing', 'UI/UX Design', 'Figma',
+  'Algorithms', 'Data Structures', 'Machine Learning', 'Data Science', 'PyTorch', 'TensorFlow',
+  'Behavioral', 'Communication', 'Leadership', 'Problem Solving', 'Teamwork'
+];
 
 export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
   const { theme } = useTheme();
@@ -59,6 +80,7 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
   const [guidelines, setGuidelines] = useState('');
   const [focusAreas, setFocusAreas] = useState('');
   const [persona, setPersona] = useState('Sarah');
+  const [skillSearch, setSkillSearch] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdJobId, setCreatedJobId] = useState<string | null>(null);
@@ -180,6 +202,16 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
     setFocusAreas('');
     setPersona('Sarah');
   };
+
+  const activeSkills = focusAreas ? focusAreas.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+  const filteredSuggestions = skillSearch
+    ? SUGGESTED_SKILLS.filter(
+        skill =>
+          skill.toLowerCase().includes(skillSearch.toLowerCase()) &&
+          !activeSkills.some(as => as.toLowerCase() === skill.toLowerCase())
+      ).slice(0, 5)
+    : [];
 
   // --- SUCCESS STATE ---
   if (createdJobId) {
@@ -424,23 +456,103 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
                 <Tag size={16} className="text-purple-500" />
                 Technical & Skill Focus
               </label>
-              <input
-                value={focusAreas}
-                onChange={(e) => setFocusAreas(e.target.value)}
-                placeholder="e.g. React, Redux, Performance, System Design"
-                className={cn(
-                  "w-full px-4 py-3 rounded-xl border outline-none transition-all text-base",
-                  theme === 'light'
-                    ? "bg-white border-gray-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 text-gray-900 placeholder:text-gray-400"
-                    : "bg-black/40 border-zinc-700 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-white placeholder:text-zinc-650"
+              
+              {/* Selected Skill Tags */}
+              {activeSkills.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2 p-3 rounded-xl border border-dashed border-gray-200 dark:border-zinc-800 bg-gray-50/50 dark:bg-black/10">
+                  {activeSkills.map(skill => (
+                    <span 
+                      key={skill} 
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:border-purple-800 dark:text-purple-350 animate-fade-in"
+                    >
+                      {skill}
+                      <button
+                        type="button"
+                        onClick={() => handleAddSkill(skill)}
+                        className="hover:text-red-500 transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Autocomplete Input Container */}
+              <div className="relative">
+                <input
+                  value={skillSearch}
+                  onChange={(e) => setSkillSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const trimmed = skillSearch.trim();
+                      if (trimmed) {
+                        handleAddSkill(trimmed);
+                        setSkillSearch('');
+                      }
+                    }
+                  }}
+                  placeholder="Type a skill (e.g. Product Management, React) and press Enter"
+                  className={cn(
+                    "w-full px-4 py-3 rounded-xl border outline-none transition-all text-base",
+                    theme === 'light'
+                      ? "bg-white border-gray-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 text-gray-900 placeholder:text-gray-400"
+                      : "bg-black/40 border-zinc-700 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-white placeholder:text-zinc-650"
+                  )}
+                  disabled={isSubmitting}
+                />
+                
+                {/* Suggestions Dropdown */}
+                {skillSearch && (
+                  <div className={cn(
+                    "absolute left-0 right-0 mt-1.5 rounded-xl border shadow-xl z-20 max-h-60 overflow-y-auto",
+                    theme === 'light' ? "bg-white border-gray-200" : "bg-zinc-900 border-zinc-800"
+                  )}>
+                    {filteredSuggestions.map(suggestion => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => {
+                          handleAddSkill(suggestion);
+                          setSkillSearch('');
+                        }}
+                        className={cn(
+                          "w-full px-4 py-2.5 text-left text-sm transition-colors flex items-center justify-between",
+                          theme === 'light' ? "hover:bg-gray-50 text-gray-700" : "hover:bg-white/5 text-zinc-300"
+                        )}
+                      >
+                        <span>{suggestion}</span>
+                        <span className="text-[10px] uppercase font-bold text-purple-600 dark:text-purple-400">Suggest</span>
+                      </button>
+                    ))}
+                    {/* Add Custom Skill Option */}
+                    {!filteredSuggestions.some(s => s.toLowerCase() === skillSearch.toLowerCase()) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleAddSkill(skillSearch.trim());
+                          setSkillSearch('');
+                        }}
+                        className={cn(
+                          "w-full px-4 py-2.5 text-left text-sm font-semibold transition-colors flex items-center justify-between border-t border-dashed",
+                          theme === 'light' ? "hover:bg-purple-50/50 border-gray-150 text-purple-700" : "hover:bg-purple-950/20 border-zinc-800 text-purple-400"
+                        )}
+                      >
+                        <span>Add custom skill "{skillSearch.trim()}"</span>
+                        <span className="text-[10px] uppercase font-bold text-purple-600 dark:text-purple-400">New</span>
+                      </button>
+                    )}
+                  </div>
                 )}
-                disabled={isSubmitting}
-              />
+              </div>
+
+              {/* Quick Suggestions underneath */}
               <div className="space-y-1.5">
                 <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-zinc-500 tracking-wider">Quick Suggestions:</span>
                 <div className="flex flex-wrap gap-2">
-                  {SUGGESTED_SKILLS.map((skill) => {
-                    const isAdded = focusAreas.toLowerCase().includes(skill.toLowerCase());
+                  {SUGGESTED_SKILLS.slice(0, 10).map((skill) => {
+                    const isAdded = activeSkills.some(as => as.toLowerCase() === skill.toLowerCase());
                     return (
                       <button
                         key={skill}
@@ -459,9 +571,9 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
                       </button>
                     );
                   })}
-                </div>
               </div>
             </div>
+          </div>
 
             {/* Custom Guidelines */}
             <div className="space-y-2">
@@ -602,7 +714,10 @@ export const CreateJobPage = ({ onBack, onSuccess }: CreateJobPageProps) => {
                           : (theme === 'light' ? "bg-white border-gray-200 text-gray-600 hover:bg-gray-50" : "bg-black/20 border-zinc-700 text-gray-300 hover:bg-white/5")
                       )}
                     >
-                      <span className={isSelected ? "opacity-100" : "opacity-70"}>{type.id === 'Technical' ? '</>' : type.icon}</span>
+                      {(() => {
+                        const IconComponent = type.icon;
+                        return <IconComponent size={16} className={isSelected ? "opacity-100" : "opacity-70"} />;
+                      })()}
                       {type.label}
                     </motion.button>
                   )

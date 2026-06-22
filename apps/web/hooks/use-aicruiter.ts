@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { apolloClient } from '../lib/apollo-client';
@@ -58,7 +58,7 @@ export const useAiCruiter = () => {
   }, []);
 
   // 1. Fetch Data from GraphQL
-  const fetchJobById = async (jobId: string) => {
+  const fetchJobById = useCallback(async (jobId: string) => {
     try {
       const { data } = await apolloClient.query<any>({
         query: FETCH_JOB_BY_ID,
@@ -71,7 +71,7 @@ export const useAiCruiter = () => {
       toast.error(error.message || "Failed to fetch job details");
       return null;
     }
-  };
+  }, []);
 
   const fetchData = async () => {
     if (!clerkLoaded) return;

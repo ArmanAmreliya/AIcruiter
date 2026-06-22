@@ -153,3 +153,9 @@ export const GET_DEEPGRAM_TOKEN = gql`
     getDeepgramToken
   }
 `;
+
+export const CREATE_TRANSCRIPT = gql`
+  mutation CreateTranscript($jobId: ID!, $candidateId: ID!, $userText: String!, $aiText: String!) {
+    createTranscript(jobId: $jobId, candidateId: $candidateId, userText: $userText, aiText: $aiText)
+  }
+`;

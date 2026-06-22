@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from '../../lib/react-router-dom-compat';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, PhoneOff, AlertCircle, Loader2, Sparkles, User, Settings2 } from 'lucide-react';
 import { LoadingLogo } from '../ui/LoadingLogo';

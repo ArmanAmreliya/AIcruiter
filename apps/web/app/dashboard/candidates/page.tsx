@@ -1,8 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { CandidatesPage } from '../../../components/pages/CandidatesPage';
+import { PageLoader } from '../../../components/ui/PageLoader';
 
 export default function Candidates() {
-  return <CandidatesPage />;
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <CandidatesPage />
+    </Suspense>
+  );
 }

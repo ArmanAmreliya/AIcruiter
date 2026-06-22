@@ -51,6 +51,7 @@ export const InterviewLobby = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [isJoining, setIsJoining] = useState(false);
+    const [joinError, setJoinError] = useState<string | null>(null);
 
     // Media Testing State
     const [showTestModal, setShowTestModal] = useState(false);
@@ -96,6 +97,7 @@ export const InterviewLobby = () => {
             return;
         }
 
+        setJoinError(null);
         setIsJoining(true);
         try {
             // 1. Insert/Retrieve Candidate via GraphQL
@@ -125,9 +127,22 @@ export const InterviewLobby = () => {
 
         } catch (err: any) {
             console.error('Join error:', err);
-            if (err.message && (err.message.includes('ALREADY_COMPLETED') || err.message.includes('already completed'))) {
-                toast.error('Access Denied: You have already completed this interview. Multiple attempts are not permitted.');
+            const errMsg = err.message || String(err);
+            const hasAlreadyCompleted = 
+                errMsg.includes('ALREADY_COMPLETED') || 
+                errMsg.includes('already completed') ||
+                (err.graphQLErrors && err.graphQLErrors.some((ge: any) => 
+                    ge.message?.includes('ALREADY_COMPLETED') || 
+                    ge.extensions?.code === 'ALREADY_COMPLETED' ||
+                    ge.extensions?.exception?.code === 'ALREADY_COMPLETED'
+                ));
+
+            if (hasAlreadyCompleted) {
+                const msg = 'This email has already attempted or completed this interview. Multiple attempts are not permitted.';
+                setJoinError(msg);
+                toast.error(msg);
             } else {
+                setJoinError('Could not join interview. Please try again.');
                 toast.error('Could not join interview. Please try again.');
             }
         } finally {
@@ -252,40 +267,53 @@ export const InterviewLobby = () => {
                                             : "bg-[#1A1A1E] border-white/5 focus:bg-[#1A1A1E] focus:ring-4 focus:ring-violet-500/5 focus:border-violet-600 text-white"
                                     )}
                                     value={email}
-                                    onChange={e => setEmail(e.target.value)}
+                                    onChange={e => {
+                                        setEmail(e.target.value);
+                                        if (joinError) setJoinError(null);
+                                    }}
                                     required
                                 />
+                                {joinError && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: -5 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="flex items-center gap-1.5 mt-1.5 text-xs font-semibold text-red-500 dark:text-red-400 ml-1 animate-pulse"
+                                    >
+                                        <AlertCircle size={14} className="shrink-0" />
+                                        <span>{joinError}</span>
+                                    </motion.div>
+                                )}
                             </div>
                         </div>
 
-                        {/* Security & Access Protection Info */}
+                        {/* Candidate Guidelines & Interview Rules */}
                         <div className={cn(
                             "p-5 rounded-2xl border text-xs leading-relaxed space-y-4",
                             theme === 'light'
-                                ? "bg-purple-50/50 border-purple-100 text-purple-900"
-                                : "bg-purple-950/10 border-purple-500/10 text-purple-200"
+                                ? "bg-amber-50/60 border-amber-200/80 text-amber-900"
+                                : "bg-amber-950/10 border-amber-500/10 text-amber-200"
                         )}>
-                            <div className="flex items-center gap-2 font-bold text-sm tracking-tight text-violet-600 dark:text-purple-300">
-                                <ShieldCheck size={16} /> Information Security & Access Policy
+                            <div className="flex items-center gap-2 font-bold text-sm tracking-tight text-amber-700 dark:text-amber-400">
+                                <AlertCircle size={16} className="shrink-0" /> Important Candidate Guidelines
                             </div>
                             
                             <div className="grid gap-3.5">
                                 <div className="flex items-start gap-2.5">
-                                    <Lock size={12} className="mt-0.5 shrink-0 opacity-80" />
+                                    <Lock size={14} className="mt-0.5 shrink-0 opacity-80 text-amber-700 dark:text-amber-400" />
                                     <div>
-                                        <span className="font-bold">One-Time Session Attempt:</span> Strict rate-limiting is applied. Once an interview is completed, you cannot make multiple attempts or register duplicate profiles.
+                                        <span className="font-bold text-amber-950 dark:text-amber-300">Single-Attempt Session:</span> Once you enter the room, the session must be completed in one continuous sitting. Refreshing or leaving the page will lock you out and submit your current progress.
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-2.5">
-                                    <Key size={12} className="mt-0.5 shrink-0 opacity-80" />
+                                    <Video size={14} className="mt-0.5 shrink-0 opacity-80 text-amber-700 dark:text-amber-400" />
                                     <div>
-                                        <span className="font-bold">Low-Privilege Data Streaming:</span> Audio streams directly to isolated storage using temporary, write-only credentials (60s TTL) to prevent session-hijacking.
+                                        <span className="font-bold text-amber-950 dark:text-amber-300">Hardware Requirements:</span> Active camera and microphone permissions are required. Ensure your equipment is functional and tested before entering.
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-2.5">
-                                    <Globe size={12} className="mt-0.5 shrink-0 opacity-80" />
+                                    <ShieldCheck size={14} className="mt-0.5 shrink-0 opacity-80 text-amber-700 dark:text-amber-400" />
                                     <div>
-                                        <span className="font-bold">Transit & Rest Encryption:</span> Session feeds and metadata are protected with industry-standard TLS 1.3 in-transit and AES-256 at-rest.
+                                        <span className="font-bold text-amber-950 dark:text-amber-300">Evaluation Integrity:</span> The interview must be completed entirely by yourself. Background voice tracking and session monitoring are active to ensure authenticity.
                                     </div>
                                 </div>
                             </div>

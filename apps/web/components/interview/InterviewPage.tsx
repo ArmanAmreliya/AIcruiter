@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PhoneOff, Settings, Sparkles } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { MediaPreview } from './MediaPreview';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '../../lib/react-router-dom-compat';
 
 interface InterviewPageProps {
   jobId?: string;

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Video, Calendar, MoreVertical, Copy, BarChart3, Presentation, Users, Edit2, Trash2, AlertCircle, X, ExternalLink } from 'lucide-react';
 import { useAiCruiter } from '../../hooks/use-aicruiter';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '../../lib/react-router-dom-compat';
 import { useTheme } from '../../context/ThemeContext';
 import { PageLoader } from '../ui/PageLoader';
 import { cn } from '../../lib/utils';

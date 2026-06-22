@@ -14,6 +14,79 @@ function getGroqClient() {
   return groq;
 }
 
+export interface JobMetadata {
+  description: string;
+  guidelines: string;
+  focusAreas: string;
+  persona: string;
+}
+
+export const parseJobDescription = (fullText: string): JobMetadata => {
+  if (!fullText) {
+    return { description: '', guidelines: '', focusAreas: '', persona: 'Sarah' };
+  }
+  
+  let description = fullText;
+  let guidelines = '';
+  let focusAreas = '';
+  let persona = 'Sarah';
+
+  const sections = fullText.split('--- INTERVIEW METADATA ---');
+  if (sections.length > 1) {
+    description = sections[0].trim();
+    const metaText = sections[1];
+    
+    const guidelinesMatch = metaText.match(/\[GUIDELINES\]: ([\s\S]*?)(?=\[|$)/);
+    const focusAreasMatch = metaText.match(/\[FOCUS_AREAS\]: ([\s\S]*?)(?=\[|$)/);
+    const personaMatch = metaText.match(/\[PERSONA\]: ([\s\S]*?)(?=\[|$)/);
+
+    if (guidelinesMatch) guidelines = guidelinesMatch[1].trim();
+    if (focusAreasMatch) focusAreas = focusAreasMatch[1].trim();
+    if (personaMatch) persona = personaMatch[1].trim();
+  }
+
+  return { description, guidelines, focusAreas, persona };
+};
+
+function compressDialogue(transcripts: { aiText: string; userText: string }[], personaName: string): string {
+  const filtered = transcripts.filter((t, index) => {
+    const aiText = t.aiText.toLowerCase();
+    const userText = t.userText.toLowerCase().trim();
+    
+    // Skip initial greeting if it's the very first turn and has no meaningful content
+    if (index === 0 && (aiText.includes('welcome') || aiText.includes('thanks for joining') || aiText.includes('shall we start'))) {
+      return false;
+    }
+    
+    // Skip wrap-up/goodbye turns
+    if (aiText.includes('thank you for sharing') || aiText.includes('final wrap-up') || aiText.includes('goodbye')) {
+      return false;
+    }
+
+    // Skip empty candidate answers or trivial one-word agreements (unless it's the only transcript)
+    if (!userText || userText === '.' || userText === 'ok' || userText === 'yes' || userText === 'no') {
+      if (transcripts.length > 1) return false;
+    }
+
+    return true;
+  });
+
+  // Clean filler words and compress transcript text to reduce tokens
+  return (filtered.length > 0 ? filtered : transcripts)
+    .map(t => {
+      // Clean filler words from candidate response
+      let cleanUserText = t.userText
+        .replace(/\b(um|uh|like|you know|so|actually|basically|sort of|kind of)\b/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+        
+      if (!cleanUserText) cleanUserText = t.userText;
+      
+      return `${personaName}: ${t.aiText.trim()}\nCandidate: ${cleanUserText}`;
+    })
+    .join('\n\n');
+}
+
 export async function generateCandidateReport(candidateId: string) {
   try {
     console.log(`[Worker] Generating AI report for candidate ${candidateId}...`);
@@ -58,18 +131,22 @@ export async function generateCandidateReport(candidateId: string) {
       return;
     }
 
-    // 2. Format the transcripts for Groq
-    const dialog = candidate.transcripts
-      .map(t => `Sarah: ${t.aiText}\nCandidate: ${t.userText}`)
-      .join('\n\n');
+    // Parse job metadata
+    const jobMeta = parseJobDescription(candidate.job.description);
+    const personaName = jobMeta.persona || 'Sarah';
 
-    // 3. Request LLM evaluation from Groq
+    // 2. Format & compress the transcripts for Groq to optimize token usage
+    const dialog = compressDialogue(candidate.transcripts, personaName);
+
+    // 3. Request LLM evaluation from Groq with compressed context
     const systemPrompt = `You are an expert talent screener evaluating a candidate's live interview transcripts.
 Evaluate the candidate for the role: ${candidate.job?.title || 'Job Position'}
-Job Description: ${candidate.job?.description || 'N/A'}
+Job Requirements & Description: ${jobMeta.description}
+Key Skills to Focus On: ${jobMeta.focusAreas || 'N/A'}
+Experience Level: ${candidate.job?.experienceLevel || 'N/A'}
 
 Provide a JSON object containing:
-1. "overallScore" (number between 0 and 100 representing how well the candidate matched the job description).
+1. "overallScore" (number between 0 and 100 representing how well the candidate matched the job description and demonstrated key skills).
 2. "feedback" (string containing 2-3 sentences of constructive evaluation).
 Return ONLY the JSON. No conversational wrappers.`;
 

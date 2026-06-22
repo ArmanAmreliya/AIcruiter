@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from '../../lib/react-router-dom-compat';
 import { motion } from 'framer-motion';
 import { Plus, Sparkles, ArrowRight } from 'lucide-react';
 import { cn } from '../../lib/utils';

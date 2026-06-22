@@ -1,10 +1,9 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink } from '../../lib/react-router-dom-compat';
 import { LayoutGrid, Video, Users, Settings, LogOut, FileText } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
 import { useAiCruiter } from '../../hooks/use-aicruiter';
-import { Link } from 'react-router-dom';
 import { useClerk } from '@clerk/nextjs';
 
 export const Sidebar = () => {

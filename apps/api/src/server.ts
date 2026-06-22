@@ -176,6 +176,7 @@ const typeDefs = `#graphql
     createCandidate(jobId: ID!, name: String!, email: String!): Candidate!
     updateCandidateInterviewStatus(id: ID!, status: String!, metaData: String): Candidate!
     getDeepgramToken: String!
+    createTranscript(jobId: ID!, candidateId: ID!, userText: String!, aiText: String!): Boolean!
   }
 `;
 
@@ -477,6 +478,17 @@ const resolvers = {
         // Fallback to main API key for local dev / offline tests
         return apiKey;
       }
+    },
+    createTranscript: async (_parent: any, args: { jobId: string; candidateId: string; userText: string; aiText: string }) => {
+      await prisma.interviewTranscript.create({
+        data: {
+          jobId: args.jobId,
+          candidateId: args.candidateId,
+          userText: args.userText,
+          aiText: args.aiText
+        }
+      });
+      return true;
     }
   }
 };
@@ -532,7 +544,7 @@ const startServer = async () => {
   });
 
   fastify.post('/api/speak', async (request, reply) => {
-    const { text } = request.body as { text: string };
+    const { text, persona } = request.body as { text: string; persona?: string };
     if (!text) {
       reply.status(400).send({ error: "Text parameter is required" });
       return;
@@ -544,8 +556,18 @@ const startServer = async () => {
       return;
     }
 
+    // Map selected persona to the appropriate Deepgram Aura voice model
+    let voiceModel = 'aura-asteria-en'; // Default: Sarah (female)
+    if (persona === 'David') {
+      voiceModel = 'aura-orion-en';     // David: Male voice
+    } else if (persona === 'Emma') {
+      voiceModel = 'aura-stella-en';    // Emma: Female voice (Stella)
+    } else if (persona === 'Sarah') {
+      voiceModel = 'aura-asteria-en';   // Sarah: Female voice (Asteria)
+    }
+
     try {
-      const response = await fetch('https://api.deepgram.com/v1/speak?model=aura-asteria-en', {
+      const response = await fetch(`https://api.deepgram.com/v1/speak?model=${voiceModel}`, {
         method: 'POST',
         headers: {
           'Authorization': `Token ${apiKey}`,

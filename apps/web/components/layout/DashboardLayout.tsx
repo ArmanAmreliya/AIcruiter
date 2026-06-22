@@ -4,7 +4,6 @@ import { Toaster } from 'sonner';
 import {
   Menu,
   Bell,
-  Search,
   Moon,
   Sun,
   Plus
@@ -12,7 +11,8 @@ import {
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../context/ThemeContext';
 import { Sidebar } from './Sidebar';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '../../lib/react-router-dom-compat';
+import { useAiCruiter } from '../../hooks/use-aicruiter';
 
 interface DashboardLayoutProps {
   children?: React.ReactNode;
@@ -24,15 +24,8 @@ export const DashboardLayout = ({ children, onLogout, onCreateJob }: DashboardLa
   const { theme, toggleTheme } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const { user } = useAiCruiter();
   const navigate = useNavigate();
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/dashboard/candidates?search=${encodeURIComponent(searchQuery)}`);
-    }
-  };
 
   return (
     <div className={cn("min-h-screen flex transition-colors duration-300", theme === 'light' ? "bg-white" : "bg-black")}>
@@ -98,22 +91,15 @@ export const DashboardLayout = ({ children, onLogout, onCreateJob }: DashboardLa
               <Menu size={20} className={theme === 'light' ? "text-black" : "text-white"} />
             </button>
 
-            {/* Search Bar */}
-            <form onSubmit={handleSearch} className={cn(
-              "hidden md:flex items-center px-3 py-2 rounded-full border w-64 transition-colors",
-              theme === 'light'
-                ? "bg-black/5 border-transparent text-black focus-within:bg-white focus-within:border-black/20 focus-within:ring-2 focus-within:ring-black/5"
-                : "bg-white/5 border-transparent text-white focus-within:bg-black focus-within:border-white/20 focus-within:ring-2 focus-within:ring-white/5"
-            )}>
-              <Search size={14} className="opacity-50 mr-2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search candidates..."
-                className="bg-transparent border-none outline-none text-sm w-full placeholder:text-inherit"
-              />
-            </form>
+            {/* Dynamic Welcome Message */}
+            <div className="hidden md:flex flex-col">
+              <span className={cn("text-sm font-semibold tracking-tight", theme === 'light' ? "text-black/80" : "text-white/80")}>
+                Welcome back, <span className="text-[#7950F2] font-bold">{user?.name || 'Recruiter'}</span> 👋
+              </span>
+              <span className={cn("text-[10px] font-medium opacity-50", theme === 'light' ? "text-black/60" : "text-white/60")}>
+                Here's what's happening with your recruitment pipelines today.
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-4">

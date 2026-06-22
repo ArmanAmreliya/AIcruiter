@@ -19,14 +19,16 @@ import {
   Activity,
   Award,
   BookOpen,
-  Download
+  Download,
+  ArrowUpDown,
+  ChevronDown
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { cn } from '../../lib/utils';
 import { PageLoader } from '../ui/PageLoader';
 import { toast } from 'sonner';
 import { useUser } from '@clerk/nextjs';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from '../../lib/react-router-dom-compat';
 import { apolloClient } from '../../lib/apollo-client';
 import { GET_CANDIDATES, UPDATE_CANDIDATE_STATUS } from '../../lib/graphql-queries';
 
@@ -81,14 +83,137 @@ const formatDate = (dateInput?: any) => {
   }
 };
 
+interface CustomSelectProps {
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  icon: React.ReactNode;
+  theme: string;
+}
+
+const CustomSelect = ({ value, onChange, options, icon, theme }: CustomSelectProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => o.value === value) || options[0];
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          "flex items-center justify-between gap-2 pl-10 pr-10 py-3 rounded-xl border font-bold text-sm outline-none cursor-pointer min-w-[170px] transition-all text-left w-full select-none relative",
+          theme === 'light'
+            ? "bg-white border-black/10 hover:border-purple-500 text-black hover:bg-gray-50/50"
+            : "bg-black border-white/10 hover:border-purple-500 text-white hover:bg-white/5",
+          isOpen && "border-purple-500 ring-2 ring-purple-500/10"
+        )}
+      >
+        <div className="flex items-center gap-2">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 shrink-0">{icon}</span>
+          <span className="truncate">{selectedOption.label}</span>
+        </div>
+        <ChevronDown size={14} className={cn("absolute right-3 top-1/2 -translate-y-1/2 opacity-40 transition-transform duration-200 shrink-0", isOpen && "rotate-180")} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className={cn(
+              "absolute right-0 top-full mt-2 w-full min-w-[180px] rounded-2xl border p-1.5 shadow-xl z-30 max-h-[250px] overflow-y-auto no-scrollbar",
+              theme === 'light' ? "bg-white border-slate-100 shadow-slate-200/50 text-slate-800" : "bg-zinc-950 border-white/5 shadow-black/80 text-white"
+            )}
+          >
+            {options.map((option) => {
+              const isSelected = option.value === value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(option.value);
+                    setIsOpen(false);
+                  }}
+                  className={cn(
+                    "flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs font-bold text-left transition-colors select-none",
+                    isSelected 
+                      ? "bg-[#7950F2] text-white"
+                      : theme === 'light'
+                        ? "hover:bg-purple-50 hover:text-purple-700 text-slate-700"
+                        : "hover:bg-white/5 hover:text-purple-400 text-zinc-300"
+                  )}
+                >
+                  <span>{option.label}</span>
+                  {isSelected && <Check size={12} className="shrink-0" />}
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const statusOptions = [
+  { value: "All", label: "All Status" },
+  { value: "STARTED", label: "Interviewing" },
+  { value: "COMPLETED", label: "Completed" },
+  { value: "Accepted", label: "Accepted" },
+  { value: "Rejected", label: "Rejected" }
+];
+
+const ratingOptions = [
+  { value: "All", label: "All Ratings" },
+  { value: "5", label: "5 Stars ★★★★★" },
+  { value: "4+", label: "4+ Stars ★★★★☆" },
+  { value: "3+", label: "3+ Stars ★★★☆☆" },
+  { value: "2+", label: "2+ Stars ★★☆☆☆" },
+  { value: "unrated", label: "Unrated" }
+];
+
+const sortOptions = [
+  { value: "newest", label: "Newest First" },
+  { value: "oldest", label: "Oldest First" },
+  { value: "score_desc", label: "Score: High to Low" },
+  { value: "score_asc", label: "Score: Low to High" },
+  { value: "rating_desc", label: "Rating: High to Low" }
+];
+
 export const CandidatesPage = () => {
   const { theme } = useTheme();
   const { user: clerkUser } = useUser();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setSearchStatusFilter] = useState<string>('All');
+  const [ratingFilter, setRatingFilter] = useState<string>('All');
+  const [sortBy, setSortBy] = useState<string>('newest');
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
+
+  // Initialize and sync searchQuery from URL parameter "?search="
+  useEffect(() => {
+    const q = searchParams.get('search');
+    if (q !== null) {
+      setSearchQuery(q);
+    }
+  }, [searchParams]);
 
   // Fetch Candidates from GraphQL
   const fetchCandidates = async () => {
@@ -140,21 +265,58 @@ export const CandidatesPage = () => {
     fetchCandidates();
   }, []);
 
-  // --- Filtering Logic ---
+  // --- Filtering & Sorting Logic ---
   const filteredCandidates = useMemo(() => {
-    return candidates.filter(c => {
+    const filtered = candidates.filter(c => {
       const candidateName = c.name ? c.name.toLowerCase() : '';
       const candidateRole = c.role ? c.role.toLowerCase() : '';
+      const candidateEmail = c.email ? c.email.toLowerCase() : '';
       const query = searchQuery ? searchQuery.toLowerCase() : '';
 
       const matchesSearch = candidateName.includes(query) ||
-        candidateRole.includes(query);
+        candidateRole.includes(query) ||
+        candidateEmail.includes(query) ||
+        (c.metaData?.feedback && c.metaData.feedback.toLowerCase().includes(query));
 
       const matchesStatus = statusFilter === 'All' || c.status === statusFilter;
 
-      return matchesSearch && matchesStatus;
+      // Rating Filter
+      let matchesRating = true;
+      const rating = c.metaData?.rating;
+      if (ratingFilter === '5') {
+        matchesRating = rating === 5;
+      } else if (ratingFilter === '4+') {
+        matchesRating = rating !== undefined && rating >= 4;
+      } else if (ratingFilter === '3+') {
+        matchesRating = rating !== undefined && rating >= 3;
+      } else if (ratingFilter === '2+') {
+        matchesRating = rating !== undefined && rating >= 2;
+      } else if (ratingFilter === 'unrated') {
+        matchesRating = !rating;
+      }
+
+      return matchesSearch && matchesStatus && matchesRating;
     });
-  }, [candidates, searchQuery, statusFilter]);
+
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'newest') {
+        return new Date(b.appliedDate).getTime() - new Date(a.appliedDate).getTime();
+      }
+      if (sortBy === 'oldest') {
+        return new Date(a.appliedDate).getTime() - new Date(b.appliedDate).getTime();
+      }
+      if (sortBy === 'score_desc') {
+        return b.matchScore - a.matchScore;
+      }
+      if (sortBy === 'score_asc') {
+        return a.matchScore - b.matchScore;
+      }
+      if (sortBy === 'rating_desc') {
+        return (b.metaData?.rating || 0) - (a.metaData?.rating || 0);
+      }
+      return 0;
+    });
+  }, [candidates, searchQuery, statusFilter, ratingFilter, sortBy]);
 
   // --- Actions ---
   const handleStatusChange = async (id: string, newStatus: string) => {
@@ -330,216 +492,225 @@ export const CandidatesPage = () => {
   }
 
   return (
-    <div className="animate-fade-in-up space-y-8 font-sans">
+    <div className="space-y-8 font-sans">
+      <div className="animate-fade-in-up space-y-8">
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className={cn("text-4xl font-bold tracking-tight mb-2", theme === 'light' ? "text-black" : "text-white")}>
-            Candidate Pool
-          </h1>
-          <div className="flex items-center gap-2">
-            <span className={cn("text-lg", theme === 'light' ? "text-black/60" : "text-white/60")}>
-              Review and manage applications
-            </span>
-            <span className={cn(
-              "px-2 py-0.5 rounded-full text-xs font-bold border",
-              theme === 'light' ? "bg-purple-600 text-white border-purple-500" : "bg-purple-500 text-white border-purple-400"
-            )}>
-              {candidates.length}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div className={cn(
-        "flex flex-col md:flex-row gap-4 p-4 rounded-2xl border transition-colors",
-        theme === 'light' ? "bg-white border-black/5" : "bg-zinc-900 border-white/10"
-      )}>
-        <div className={cn(
-          "flex-1 flex items-center px-4 py-3 rounded-xl border transition-all",
-          theme === 'light'
-            ? "bg-gray-50 border-transparent focus-within:bg-white focus-within:border-purple-500 focus-within:ring-4 focus-within:ring-purple-100"
-            : "bg-black border-white/10 focus-within:border-purple-500 focus-within:ring-4 focus-within:ring-purple-500/20 text-white"
-        )}>
-          <Search size={18} className={cn("mr-3", theme === 'light' ? "text-black/40" : "text-white/40")} />
-          <input
-            type="text"
-            placeholder="Search by name or skill..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-transparent border-none outline-none w-full text-sm font-medium placeholder:text-gray-400"
-          />
-        </div>
-
-        <div className="flex gap-4">
-          <div className="relative group">
-            <select
-              value={statusFilter}
-              onChange={(e) => setSearchStatusFilter(e.target.value)}
-              className={cn(
-                "appearance-none pl-4 pr-10 py-3 rounded-xl border font-bold text-sm outline-none cursor-pointer min-w-[150px] transition-all",
-                theme === 'light'
-                  ? "bg-white border-black/10 hover:border-purple-500 text-black"
-                  : "bg-black border-white/10 hover:border-purple-500 text-white"
-              )}
-            >
-              <option value="All">All Status</option>
-              <option value="STARTED">Interviewing</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="Accepted">Accepted</option>
-              <option value="Rejected">Rejected</option>
-            </select>
-            <Filter size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
-          </div>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className={cn(
-        "rounded-3xl border overflow-hidden shadow-sm",
-        theme === 'light' ? "bg-white border-black/5" : "bg-black border-white/10"
-      )}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className={cn(
-                "border-b text-xs uppercase tracking-wider",
-                theme === 'light' ? "border-black/5 text-black/40" : "border-white/10 text-white/40"
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 className={cn("text-4xl font-bold tracking-tight mb-2", theme === 'light' ? "text-black" : "text-white")}>
+              Candidate Pool
+            </h1>
+            <div className="flex items-center gap-2">
+              <span className={cn("text-lg", theme === 'light' ? "text-black/60" : "text-white/60")}>
+                Review and manage applications
+              </span>
+              <span className={cn(
+                "px-2 py-0.5 rounded-full text-xs font-bold border",
+                theme === 'light' ? "bg-purple-600 text-white border-purple-500" : "bg-purple-500 text-white border-purple-400"
               )}>
-                <th className="p-6 font-bold">Candidate</th>
-                <th className="p-6 font-bold">Applied For</th>
-                <th className="p-6 font-bold">AI Match</th>
-                <th className="p-6 font-bold">Status</th>
-                <th className="p-6 font-bold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <AnimatePresence>
-                {filteredCandidates.map((candidate) => (
-                  <motion.tr
-                    key={candidate.id}
-                    layout
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    onClick={() => setSelectedCandidate(candidate)}
-                    className={cn(
-                      "group border-b last:border-b-0 transition-colors cursor-pointer",
-                      theme === 'light' ? "border-black/5 hover:bg-purple-50/20" : "border-white/5 hover:bg-[#151220]/20"
-                    )}
-                  >
-                    <td className="p-6">
-                      <div className="flex items-center gap-4">
-                        <img src={candidate.avatar} alt={candidate.name} className="w-10 h-10 rounded-full bg-gray-200 object-cover" />
-                        <div>
-                          <div className={cn("font-bold text-sm", theme === 'light' ? "text-black" : "text-white")}>{candidate.name}</div>
-                          <div className={cn("text-xs", theme === 'light' ? "text-black/50" : "text-white/50")}>{formatDate(candidate.appliedDate)}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-6">
-                      <div className={cn("flex items-center gap-2 text-sm font-medium", theme === 'light' ? "text-black/70" : "text-white/70")}>
-                        <Briefcase size={14} />
-                        {candidate.role}
-                      </div>
-                    </td>
-                    <td className="p-6">
-                      <div className={cn(
-                        "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-sm",
-                        getScoreColor(candidate.matchScore)
-                      )}>
-                        <BrainCircuit size={12} />
-                        {candidate.matchScore > 0 ? `${candidate.matchScore}%` : 'Pending'}
-                      </div>
-                    </td>
-                    <td className="p-6">
-                      <span className={cn(
-                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
-                        candidate.status === 'Accepted' && (theme === 'light' ? "bg-purple-100 text-purple-800 border-purple-200" : "bg-purple-950/40 text-purple-300 border-purple-850/50"),
-                        candidate.status === 'Rejected' && (theme === 'light' ? "bg-zinc-150 text-zinc-650 border-zinc-250" : "bg-zinc-800/40 text-zinc-455 border-zinc-700/50"),
-                        candidate.status === 'COMPLETED' && (theme === 'light' ? "bg-violet-100 text-violet-850 border-violet-200" : "bg-violet-950/40 text-violet-300 border-violet-850/50"),
-                        candidate.status === 'STARTED' && (theme === 'light' ? "bg-indigo-100 text-indigo-850 border-indigo-200" : "bg-indigo-950/40 text-indigo-300 border-indigo-850/50"),
-                      )}>
-                        {candidate.status === 'STARTED' ? 'Interviewing' : candidate.status === 'COMPLETED' ? 'Completed' : candidate.status}
-                      </span>
-                    </td>
-                    <td className="p-6" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {candidate.status !== 'Accepted' && candidate.status !== 'Rejected' && (
-                          <>
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => handleStatusChange(candidate.id, 'Accepted')}
-                              className={cn(
-                                "w-8 h-8 rounded-full flex items-center justify-center border shadow-sm transition-colors",
-                                theme === 'light'
-                                  ? "bg-white border-black/10 hover:bg-purple-600 hover:text-white hover:border-purple-600"
-                                  : "bg-black border-white/20 hover:bg-purple-600 hover:text-white hover:border-purple-600"
-                              )}
-                              title="Accept"
-                            >
-                              <Check size={14} />
-                            </motion.button>
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => handleStatusChange(candidate.id, 'Rejected')}
-                              className={cn(
-                                "w-8 h-8 rounded-full flex items-center justify-center border shadow-sm transition-colors",
-                                theme === 'light'
-                                  ? "bg-white border-black/10 hover:bg-zinc-750 hover:text-white hover:border-zinc-750"
-                                  : "bg-black border-white/20 hover:bg-zinc-750 hover:text-white hover:border-zinc-750"
-                              )}
-                              title="Reject"
-                            >
-                              <X size={14} />
-                            </motion.button>
-                          </>
-                        )}
-                        <button 
-                          onClick={() => setSelectedCandidate(candidate)}
-                          className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
-                            theme === 'light' ? "hover:bg-purple-100/50" : "hover:bg-purple-900/20"
-                          )}
-                        >
-                          <MoreHorizontal size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
-              </AnimatePresence>
+                {candidates.length}
+              </span>
+            </div>
+          </div>
+        </div>
 
-              {filteredCandidates.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="p-12 text-center">
-                    <div className="flex flex-col items-center justify-center text-gray-400">
-                      <User size={48} className="mb-4 opacity-20" />
-                      <p className="text-lg font-medium">No candidates found for this search</p>
-                      <p className="text-sm">Try adjusting your filters.</p>
-                    </div>
-                  </td>
+        {/* Toolbar */}
+        <div className={cn(
+          "flex flex-col xl:flex-row gap-4 p-4 rounded-2xl border transition-colors",
+          theme === 'light' ? "bg-white border-black/5" : "bg-zinc-900 border-white/10"
+        )}>
+          <div className={cn(
+            "flex-1 flex items-center px-4 py-3 rounded-xl border transition-all",
+            theme === 'light'
+              ? "bg-gray-50 border-transparent focus-within:bg-white focus-within:border-purple-500 focus-within:ring-4 focus-within:ring-purple-100"
+              : "bg-black border-white/10 focus-within:border-purple-500 focus-within:ring-4 focus-within:ring-purple-500/20 text-white"
+          )}>
+            <Search size={18} className={cn("mr-3", theme === 'light' ? "text-black/40" : "text-white/40")} />
+            <input
+              type="text"
+              placeholder="Search by name, email, role, or skills..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-transparent border-none outline-none w-full text-sm font-medium placeholder:text-gray-400"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-4">
+            {/* Status Filter */}
+            <CustomSelect
+              value={statusFilter}
+              onChange={setSearchStatusFilter}
+              options={statusOptions}
+              icon={<Filter size={14} />}
+              theme={theme}
+            />
+
+            {/* Rating Filter */}
+            <CustomSelect
+              value={ratingFilter}
+              onChange={setRatingFilter}
+              options={ratingOptions}
+              icon={<Star size={14} className="text-yellow-500" fill="currentColor" />}
+              theme={theme}
+            />
+
+            {/* Sort By */}
+            <CustomSelect
+              value={sortBy}
+              onChange={setSortBy}
+              options={sortOptions}
+              icon={<ArrowUpDown size={14} />}
+              theme={theme}
+            />
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className={cn(
+          "rounded-3xl border overflow-hidden shadow-sm",
+          theme === 'light' ? "bg-white border-black/5" : "bg-black border-white/10"
+        )}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className={cn(
+                  "border-b text-xs uppercase tracking-wider",
+                  theme === 'light' ? "border-black/5 text-black/40" : "border-white/10 text-white/40"
+                )}>
+                  <th className="p-6 font-bold">Candidate</th>
+                  <th className="p-6 font-bold">Applied For</th>
+                  <th className="p-6 font-bold">AI Match</th>
+                  <th className="p-6 font-bold">Status</th>
+                  <th className="p-6 font-bold text-right">Actions</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                <AnimatePresence>
+                  {filteredCandidates.map((candidate) => (
+                    <motion.tr
+                      key={candidate.id}
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={() => setSelectedCandidate(candidate)}
+                      className={cn(
+                        "group border-b last:border-b-0 transition-colors cursor-pointer",
+                        theme === 'light' ? "border-black/5 hover:bg-purple-50/20" : "border-white/5 hover:bg-[#151220]/20"
+                      )}
+                    >
+                      <td className="p-6">
+                        <div className="flex items-center gap-4">
+                          <img src={candidate.avatar} alt={candidate.name} className="w-10 h-10 rounded-full bg-gray-200 object-cover" />
+                          <div>
+                            <div className={cn("font-bold text-sm", theme === 'light' ? "text-black" : "text-white")}>{candidate.name}</div>
+                            <div className={cn("text-xs", theme === 'light' ? "text-black/50" : "text-white/50")}>{formatDate(candidate.appliedDate)}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-6">
+                        <div className={cn("flex items-center gap-2 text-sm font-medium", theme === 'light' ? "text-black/70" : "text-white/70")}>
+                          <Briefcase size={14} />
+                          {candidate.role}
+                        </div>
+                      </td>
+                      <td className="p-6">
+                        <div className={cn(
+                          "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-sm",
+                          getScoreColor(candidate.matchScore)
+                        )}>
+                          <BrainCircuit size={12} />
+                          {candidate.matchScore > 0 ? `${candidate.matchScore}%` : 'Pending'}
+                        </div>
+                      </td>
+                      <td className="p-6">
+                        <span className={cn(
+                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                          candidate.status === 'Accepted' && (theme === 'light' ? "bg-purple-100 text-purple-800 border-purple-200" : "bg-purple-950/40 text-purple-300 border-purple-850/50"),
+                          candidate.status === 'Rejected' && (theme === 'light' ? "bg-zinc-150 text-zinc-650 border-zinc-250" : "bg-zinc-800/40 text-zinc-455 border-zinc-700/50"),
+                          candidate.status === 'COMPLETED' && (theme === 'light' ? "bg-violet-100 text-violet-850 border-violet-200" : "bg-violet-950/40 text-violet-300 border-violet-850/50"),
+                          candidate.status === 'STARTED' && (theme === 'light' ? "bg-indigo-100 text-indigo-850 border-indigo-200" : "bg-indigo-950/40 text-indigo-300 border-indigo-850/50"),
+                        )}>
+                          {candidate.status === 'STARTED' ? 'Interviewing' : candidate.status === 'COMPLETED' ? 'Completed' : candidate.status}
+                        </span>
+                      </td>
+                      <td className="p-6" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {candidate.status !== 'Accepted' && candidate.status !== 'Rejected' && (
+                            <>
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => handleStatusChange(candidate.id, 'Accepted')}
+                                className={cn(
+                                  "w-8 h-8 rounded-full flex items-center justify-center border shadow-sm transition-colors",
+                                  theme === 'light'
+                                    ? "bg-white border-black/10 hover:bg-purple-600 hover:text-white hover:border-purple-600"
+                                    : "bg-black border-white/20 hover:bg-purple-600 hover:text-white hover:border-purple-600"
+                                )}
+                                title="Accept"
+                              >
+                                <Check size={14} />
+                              </motion.button>
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => handleStatusChange(candidate.id, 'Rejected')}
+                                className={cn(
+                                  "w-8 h-8 rounded-full flex items-center justify-center border shadow-sm transition-colors",
+                                  theme === 'light'
+                                    ? "bg-white border-black/10 hover:bg-zinc-750 hover:text-white hover:border-zinc-750"
+                                    : "bg-black border-white/20 hover:bg-zinc-750 hover:text-white hover:border-zinc-750"
+                                )}
+                                title="Reject"
+                              >
+                                <X size={14} />
+                              </motion.button>
+                            </>
+                          )}
+                          <button 
+                            onClick={() => setSelectedCandidate(candidate)}
+                            className={cn(
+                              "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
+                              theme === 'light' ? "hover:bg-purple-100/50" : "hover:bg-purple-900/20"
+                            )}
+                          >
+                            <MoreHorizontal size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
+
+                {filteredCandidates.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="p-12 text-center">
+                      <div className="flex flex-col items-center justify-center text-gray-400">
+                        <User size={48} className="mb-4 opacity-20" />
+                        <p className="text-lg font-medium">No candidates found for this search</p>
+                        <p className="text-sm">Try adjusting your filters.</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      {/* Candidate Details Modal */}
+      {/* Candidate Details Modal (placed outside animate-fade-in-up wrapper, direct child of root div) */}
       <AnimatePresence>
         {selectedCandidate && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
-              animate={{ opacity: 0.6 }}
+              animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedCandidate(null)}
-              className="absolute inset-0 bg-transparent"
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
 
             <motion.div

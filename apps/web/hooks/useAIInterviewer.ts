@@ -4,6 +4,13 @@ import { apolloClient } from '../lib/apollo-client';
 import { GET_DEEPGRAM_TOKEN } from '../lib/graphql-queries';
 import { toast } from 'sonner';
 import { parseJobDescription } from '../lib/utils';
+import { gql } from '@apollo/client';
+
+const CREATE_TRANSCRIPT_MUTATION = gql`
+  mutation CreateTranscript($jobId: ID!, $candidateId: ID!, $userText: String!, $aiText: String!) {
+    createTranscript(jobId: $jobId, candidateId: $candidateId, userText: $userText, aiText: $aiText)
+  }
+`;
 
 // --- Safe Environment Fetch Helper ---
 const getEnv = (key: string): string | undefined => {
@@ -351,13 +358,14 @@ ${promptDetails}
                 apiUrl = process.env.NEXT_PUBLIC_API_URL.replace('/graphql', '');
             }
 
-            logTrace(`Requesting TTS from local proxy: ${apiUrl}/api/speak`);
+            const { persona } = parseJobDescription(contextRef.current.jobDescription);
+            logTrace(`Requesting TTS for persona ${persona} from local proxy: ${apiUrl}/api/speak`);
             const response = await fetch(`${apiUrl}/api/speak`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ text })
+                body: JSON.stringify({ text, persona })
             });
 
             if (!response.ok) throw new Error(`TTS service returned status ${response.status}`);
@@ -452,13 +460,14 @@ ${promptDetails}
                 apiUrl = process.env.NEXT_PUBLIC_API_URL.replace('/graphql', '');
             }
 
-            logTrace(`Requesting TTS for final wrap-up from local proxy: ${apiUrl}/api/speak`);
+            const { persona } = parseJobDescription(contextRef.current.jobDescription);
+            logTrace(`Requesting TTS for final wrap-up of persona ${persona} from local proxy: ${apiUrl}/api/speak`);
             const response = await fetch(`${apiUrl}/api/speak`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ text })
+                body: JSON.stringify({ text, persona })
             });
 
             if (!response.ok) throw new Error(`TTS service returned status ${response.status}`);
@@ -492,16 +501,18 @@ ${promptDetails}
 
     const saveTranscript = async (question: string, answer: string) => {
         try {
-            const { error } = await supabase.from('InterviewTranscript').insert({
-                jobId: jobId,
-                candidateId: candidateId,
-                userText: question,
-                aiText: answer
+            await apolloClient.mutate({
+                mutation: CREATE_TRANSCRIPT_MUTATION,
+                variables: {
+                    jobId: jobId,
+                    candidateId: candidateId,
+                    userText: question,
+                    aiText: answer
+                }
             });
-            if (error) throw error;
-            logTrace("Supabase dialogue transcript saved successfully");
+            logTrace("Dialogue transcript saved successfully via GraphQL");
         } catch (error: any) {
-            logTrace(`WARNING: Failed to save dialogue to Supabase: ${error.message || error}`);
+            logTrace(`WARNING: Failed to save dialogue via GraphQL: ${error.message || error}`);
         }
     };
 
