@@ -1,5 +1,6 @@
 import { SSTConfig } from "sst";
 import { Api, NextjsSite, Queue, Function } from "sst/constructs";
+import { Certificate } from "aws-cdk-lib/aws-certificatemanager";
 
 export default {
   config(_input) {
@@ -55,7 +56,17 @@ export default {
       // 3. Next.js Web App Site
       const web = new NextjsSite(stack, "web", {
         path: "apps/web",
-        customDomain: "aicruiter.me",
+        customDomain: {
+          domainName: "aicruiter.me",
+          isExternalDomain: true,
+          cdk: {
+            certificate: Certificate.fromCertificateArn(
+              stack,
+              "NextjsSiteCert",
+              "arn:aws:acm:us-east-1:520900723137:certificate/68ae5ad3-0467-427b-906c-ea06ac1ea06e"
+            ),
+          },
+        },
         environment: {
           NEXT_PUBLIC_API_URL: api.url,
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "",
