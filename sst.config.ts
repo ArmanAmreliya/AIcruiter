@@ -55,6 +55,7 @@ export default {
       // 3. Next.js Web App Site
       const web = new NextjsSite(stack, "web", {
         path: "apps/web",
+        customDomain: "aicruiter.me",
         environment: {
           NEXT_PUBLIC_API_URL: api.url,
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "",
