@@ -29,12 +29,15 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm --filter @aicruiter/web exec playwright install --with-deps
 
+      - name: Create mock env file
+        run: |
+          echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_cGF0aWVudC10b3J0b2lzZS02Ni5jbGVyay5hY2NvdW50cy5kZXYk" > .env
+          echo "CLERK_SECRET_KEY=sk_test_mock_secret_key_for_testing" >> .env
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres" >> .env
+          echo "DIRECT_URL=postgresql://postgres:postgres@localhost:5432/postgres" >> .env
+
       - name: Run pre-deploy checks
         run: pnpm run pre-deploy
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_cGF0aWVudC10b3J0b2lzZS02Ni5jbGVyay5hY2NvdW50cy5kZXYk
-          CLERK_SECRET_KEY: sk_test_mock_secret_key_for_testing
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
 
   deploy:
     runs-on: ubuntu-latest
