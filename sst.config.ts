@@ -28,7 +28,10 @@ export default {
       // 2. Fastify API via AWS Lambda Web Adapter (Docker container)
       const apiFunction = new Function(stack, "ApiFunction", {
         runtime: "container",
-        handler: "apps/api",
+        container: {
+          context: ".",
+          file: "apps/api/Dockerfile",
+        },
         timeout: "30 seconds",
         environment: {
           DATABASE_URL: process.env.DATABASE_URL || "",
