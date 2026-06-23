@@ -27,7 +27,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps
+        run: pnpm --filter @aicruiter/web exec playwright install --with-deps
 
       - name: Run pre-deploy checks
         run: pnpm run pre-deploy
