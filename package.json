@@ -9,7 +9,10 @@
     "lint": "turbo run lint",
     "test:e2e": "turbo run test:e2e",
     "test:unit": "turbo run test:unit",
-    "pre-deploy": "node scripts/pre-deploy.js"
+    "pre-deploy": "node scripts/pre-deploy.js",
+    "sst:dev": "sst dev",
+    "sst:deploy": "sst deploy",
+    "sst:remove": "sst remove"
   },
   "pnpm": {
     "overrides": {
@@ -24,6 +27,9 @@
     }
   },
   "devDependencies": {
+    "aws-cdk-lib": "^2.110.0",
+    "constructs": "^10.3.0",
+    "sst": "^2.43.0",
     "turbo": "^2.0.4"
   }
 }
