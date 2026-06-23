@@ -496,6 +496,14 @@ const resolvers = {
 const startServer = async () => {
   const fastify = Fastify({ logger: true });
 
+  // Security mitigation for GHSA-jx2c-rxcm-jvmq
+  fastify.addHook('onRequest', async (request, reply) => {
+    if (request.headers['content-type']?.includes('\t')) {
+      reply.code(400).send({ error: 'Invalid Content-Type header' });
+      return reply;
+    }
+  });
+
   await fastify.register(cors, {
     origin: true,
     credentials: true,

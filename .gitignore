@@ -32,3 +32,11 @@ dist-ssr
 .vercel/
 out/
 build/
+
+# Playwright E2E testing
+test-results/
+playwright-report/
+blob-report/
+playwright/.clerk/
+.playwright/
+

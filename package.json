@@ -6,7 +6,22 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "lint": "turbo run lint"
+    "lint": "turbo run lint",
+    "test:e2e": "turbo run test:e2e",
+    "test:unit": "turbo run test:unit",
+    "pre-deploy": "node scripts/pre-deploy.js"
+  },
+  "pnpm": {
+    "overrides": {
+      "@remix-run/router": ">=1.23.2",
+      "react-router": ">=6.30.4",
+      "fast-uri": ">=3.1.2"
+    },
+    "auditConfig": {
+      "ignoreCves": [
+        "GHSA-jx2c-rxcm-jvmq"
+      ]
+    }
   },
   "devDependencies": {
     "turbo": "^2.0.4"

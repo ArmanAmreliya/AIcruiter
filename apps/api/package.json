@@ -17,7 +17,7 @@
     "@clerk/backend": "^3.8.2",
     "@fastify/cors": "^9.0.1",
     "dotenv": "^16.4.5",
-    "fastify": "^4.26.1",
+    "fastify": "^4.29.1",
     "graphql": "^16.8.1",
     "groq-sdk": "^0.37.0",
     "zod": "^3.22.4"
