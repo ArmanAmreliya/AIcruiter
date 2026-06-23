@@ -64,6 +64,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma Client & Build Packages
+        run: pnpm run build
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+
       - name: Configure AWS credentials from IAM Role
         uses: aws-actions/configure-aws-credentials@v4
         with:
