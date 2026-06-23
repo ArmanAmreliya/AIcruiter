@@ -1,6 +1,9 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
-export default clerkMiddleware();
+export default process.env.PLAYWRIGHT === 'true'
+  ? () => NextResponse.next()
+  : clerkMiddleware();
 
 export const config = {
   matcher: [
