@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "start": "turbo run start",
     "lint": "turbo run lint",
     "test:e2e": "turbo run test:e2e",
     "test:unit": "turbo run test:unit",
