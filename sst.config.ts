@@ -65,6 +65,8 @@ export default {
           NEXT_DEEPGRAM_API_KEY: process.env.NEXT_DEEPGRAM_API_KEY || "",
           DAILY_API_KEY: process.env.DAILY_API_KEY || "",
           DAILY_ROOM_URL: process.env.DAILY_ROOM_URL || "",
+          NEXT_AI_API_KEY: process.env.NEXT_AI_API_KEY || "",
+          NEXT_REPORT_API_KEY: process.env.NEXT_REPORT_API_KEY || "",
         },
       });
 

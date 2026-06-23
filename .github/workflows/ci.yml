@@ -88,3 +88,5 @@ jobs:
           NEXT_DEEPGRAM_API_KEY: ${{ secrets.NEXT_DEEPGRAM_API_KEY }}
           DAILY_API_KEY: ${{ secrets.DAILY_API_KEY }}
           DAILY_ROOM_URL: ${{ secrets.DAILY_ROOM_URL }}
+          NEXT_AI_API_KEY: ${{ secrets.NEXT_AI_API_KEY }}
+          NEXT_REPORT_API_KEY: ${{ secrets.NEXT_REPORT_API_KEY }}
