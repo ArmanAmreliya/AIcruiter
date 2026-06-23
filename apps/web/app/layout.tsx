@@ -36,6 +36,20 @@ export default function RootLayout({
             {children}
           </ClientProviders>
         </ClerkProvider>
+
+        {/* Google Analytics Tag */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-NGK5STZQ24"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-NGK5STZQ24');
+          `}
+        </Script>
       </body>
     </html>
   );
