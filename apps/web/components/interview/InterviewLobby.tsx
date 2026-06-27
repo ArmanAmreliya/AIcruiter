@@ -2,23 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from '../../lib/react-router-dom-compat';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    CheckCircle2,
     Mic,
     Video,
-    Wifi,
     ArrowRight,
     Building2,
     Clock,
     AlertCircle,
     Loader2,
-    Globe,
     ShieldCheck,
     Lock,
-    Key
 } from 'lucide-react';
-import { LoadingLogo } from '../ui/LoadingLogo';
 import { PageLoader } from '../ui/PageLoader';
-import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../context/ThemeContext';
 import { MediaPreview } from './MediaPreview';
 import { cn } from '../../lib/utils';
@@ -26,7 +20,6 @@ import { apolloClient } from '../../lib/apollo-client';
 import { CREATE_CANDIDATE, FETCH_JOB_BY_ID } from '../../lib/graphql-queries';
 import { toast } from 'sonner';
 
-// Types (should ideally be in a types file)
 interface JobDetails {
     id: string;
     title: string;
@@ -35,7 +28,7 @@ interface JobDetails {
 }
 
 export const InterviewLobby = () => {
-    const { uniqueId } = useParams<{ uniqueId: string }>(); // This corresponds to :jobId in the route
+    const { uniqueId } = useParams<{ uniqueId: string }>();
     const navigate = useNavigate();
     const { theme, setTheme } = useTheme();
 
@@ -44,16 +37,14 @@ export const InterviewLobby = () => {
     }, [setTheme]);
 
     const [isLoading, setIsLoading] = useState(true);
-    const [job, setJob] = useState<any>(null); // Using any for flexibility with join
+    const [job, setJob] = useState<any>(null);
     const [companyName, setCompanyName] = useState('Company');
 
-    // Form State
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [isJoining, setIsJoining] = useState(false);
     const [joinError, setJoinError] = useState<string | null>(null);
 
-    // Media Testing State
     const [showTestModal, setShowTestModal] = useState(false);
     const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
     const [isMuted, setIsMuted] = useState(false);
@@ -74,14 +65,12 @@ export const InterviewLobby = () => {
             });
 
             const jobData = data?.job;
-            if (!jobData) throw new Error("Job not found");
+            if (!jobData) throw new Error('Job not found');
 
             setJob(jobData);
-
             if (jobData.user?.companyName) {
                 setCompanyName(jobData.user.companyName);
             }
-
         } catch (err: any) {
             console.error('Error fetching job:', err);
             toast.error('Failed to load interview details. Invalid link?');
@@ -100,45 +89,41 @@ export const InterviewLobby = () => {
         setJoinError(null);
         setIsJoining(true);
         try {
-            // 1. Insert/Retrieve Candidate via GraphQL
             const { data: mutateData } = await apolloClient.mutate<any>({
                 mutation: CREATE_CANDIDATE,
-                variables: {
-                    jobId: uniqueId,
-                    name: name,
-                    email: email,
-                }
+                variables: { jobId: uniqueId, name, email },
             });
 
             const candidate = mutateData?.createCandidate;
-            if (!candidate) throw new Error("Failed to register candidate");
+            if (!candidate) throw new Error('Failed to register candidate');
 
-            // 2. Success Feedback
             toast.success('Access verified! Entering interview room...');
 
-            // Store in sessionStorage to persist across page refresh
             if (typeof window !== 'undefined') {
                 sessionStorage.setItem(`candidateId_${uniqueId}`, candidate.id);
                 sessionStorage.setItem(`candidateName_${uniqueId}`, candidate.name);
             }
 
-            // 3. Navigate to Active Room
-            navigate(`/interview/${uniqueId}/room`, { state: { candidateId: candidate.id, candidateName: candidate.name } });
-
+            navigate(`/interview/${uniqueId}/room`, {
+                state: { candidateId: candidate.id, candidateName: candidate.name },
+            });
         } catch (err: any) {
             console.error('Join error:', err);
             const errMsg = err.message || String(err);
-            const hasAlreadyCompleted = 
-                errMsg.includes('ALREADY_COMPLETED') || 
+            const hasAlreadyCompleted =
+                errMsg.includes('ALREADY_COMPLETED') ||
                 errMsg.includes('already completed') ||
-                (err.graphQLErrors && err.graphQLErrors.some((ge: any) => 
-                    ge.message?.includes('ALREADY_COMPLETED') || 
-                    ge.extensions?.code === 'ALREADY_COMPLETED' ||
-                    ge.extensions?.exception?.code === 'ALREADY_COMPLETED'
-                ));
+                (err.graphQLErrors &&
+                    err.graphQLErrors.some(
+                        (ge: any) =>
+                            ge.message?.includes('ALREADY_COMPLETED') ||
+                            ge.extensions?.code === 'ALREADY_COMPLETED' ||
+                            ge.extensions?.exception?.code === 'ALREADY_COMPLETED'
+                    ));
 
             if (hasAlreadyCompleted) {
-                const msg = 'This email has already attempted or completed this interview. Multiple attempts are not permitted.';
+                const msg =
+                    'This email has already attempted or completed this interview. Multiple attempts are not permitted.';
                 setJoinError(msg);
                 toast.error(msg);
             } else {
@@ -157,250 +142,399 @@ export const InterviewLobby = () => {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             setMediaStream(stream);
         } catch (err: any) {
-            console.error("Media acquisition error:", err);
-            setMediaError(err.message || "Failed to access camera/microphone");
+            console.error('Media acquisition error:', err);
+            setMediaError(err.message || 'Failed to access camera/microphone');
         }
     };
 
     const handleCloseTest = () => {
         setShowTestModal(false);
         if (mediaStream) {
-            mediaStream.getTracks().forEach(track => track.stop());
+            mediaStream.getTracks().forEach((track) => track.stop());
             setMediaStream(null);
         }
     };
 
-    if (isLoading) {
-        return <PageLoader />;
-    }
+    if (isLoading) return <PageLoader />;
 
     if (!job) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-[#0A0A0B] text-center p-4">
+            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-center p-4">
                 <AlertCircle size={48} className="text-red-500 mb-4 animate-bounce" />
-                <h1 className="text-2xl font-bold mb-2 dark:text-white">Interview link expired or invalid</h1>
-                <p className="text-slate-500 max-w-sm">The job interview session you are attempting to join might have been deleted, or the invitation has expired.</p>
+                <h1 className="text-2xl font-bold mb-2">Interview link expired or invalid</h1>
+                <p className="text-slate-500 max-w-sm">
+                    The job interview session you are attempting to join might have been deleted, or the invitation has
+                    expired.
+                </p>
             </div>
         );
     }
 
+    const guidelines = [
+        {
+            Icon: Lock,
+            title: 'Single-Attempt Session',
+            body: 'Once you enter the room, the session must be completed in one sitting. Leaving or refreshing will lock you out.',
+        },
+        {
+            Icon: Video,
+            title: 'Hardware Requirements',
+            body: 'Active camera and microphone permissions are required. Test your equipment before entering.',
+        },
+        {
+            Icon: ShieldCheck,
+            title: 'Evaluation Integrity',
+            body: 'The interview must be completed entirely by yourself. Session monitoring is active.',
+        },
+    ];
+
     return (
-        <div className={cn(
-            "relative min-h-screen w-full flex flex-col items-center justify-center p-4 md:p-8 font-sans transition-colors duration-500 overflow-hidden",
-            theme === 'light' ? "bg-slate-50 text-slate-900" : "bg-[#0A0A0B] text-white"
-        )}>
-            {/* Ambient Background Glows */}
-            <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-purple-500/10 blur-[120px] pointer-events-none" />
-            <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-fuchsia-500/10 blur-[120px] pointer-events-none" />
+        <div
+            className={cn(
+                'fixed inset-0 flex flex-col font-sans overflow-hidden',
+                theme === 'light' ? 'bg-[#F5F3FF] text-slate-900' : 'bg-[#0A0A0B] text-white'
+            )}
+        >
+            {/* Ambient glows */}
+            <div className="absolute top-[-15%] left-[-5%] w-[45%] h-[55%] rounded-full bg-violet-500/15 blur-[100px] pointer-events-none" />
+            <div className="absolute bottom-[-15%] right-[-5%] w-[40%] h-[50%] rounded-full bg-fuchsia-500/10 blur-[100px] pointer-events-none" />
 
-            {/* Brand Header */}
-            <div className="mb-6 flex flex-col items-center relative z-10">
-                <div className="flex items-center gap-2 mb-2">
-                    <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center text-white font-black text-base shadow-lg shadow-violet-500/30">
-                        AI
+            {/* ── Top Nav Bar ── */}
+            <header className="relative z-20 flex items-center justify-between px-6 md:px-10 h-16 shrink-0">
+                {/* Logo */}
+                <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-violet-600 shadow-lg shadow-violet-500/40 flex items-center justify-center overflow-hidden">
+                        <img
+                            src="https://img.icons8.com/forma-thin/96/ffffff/bot.png"
+                            alt="AIcruiter"
+                            className="w-6 h-6 object-contain"
+                        />
                     </div>
-                    <span className="font-extrabold text-2xl tracking-tight bg-gradient-to-r from-violet-600 to-fuchsia-500 bg-clip-text text-transparent">AIcruiter</span>
+                    <span className="font-extrabold text-xl tracking-tight text-violet-600">
+                        AIcruiter
+                    </span>
                 </div>
-                <p className={cn("text-xs font-semibold tracking-widest uppercase", theme === 'light' ? "text-slate-400" : "text-slate-500")}>
-                    Secure AI Interviewer Node
-                </p>
-            </div>
 
-            <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className={cn(
-                    "relative z-10 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border backdrop-blur-md transition-all duration-500",
-                    theme === 'light' ? "bg-white/95 border-slate-200/80 shadow-slate-200/50" : "bg-[#121214]/90 border-white/5 shadow-black/60"
-                )}
-            >
-                {/* Job Context Header */}
-                <div className="p-6 md:p-8 pb-5 border-b border-white/5 bg-gradient-to-b from-purple-500/5 to-transparent">
-                    <div className="flex justify-between items-start gap-4">
-                        <div className="min-w-0">
-                            <h2 className="text-xl md:text-2xl font-bold tracking-tight truncate">{job.title}</h2>
-                            <div className="flex flex-wrap items-center gap-2 mt-2 text-xs font-semibold tracking-wide">
-                                <span className={cn("px-2.5 py-1 rounded-full", theme === 'light' ? "bg-slate-100 text-slate-700" : "bg-white/5 text-slate-300")}>{companyName}</span>
-                                <span className={cn("px-2.5 py-1 rounded-full flex items-center gap-1.5", theme === 'light' ? "bg-purple-50 text-purple-700" : "bg-purple-500/10 text-purple-300")}>
-                                    <Clock size={12} /> {job.durationMinutes || 15} mins
-                                </span>
+                {/* Secure badge */}
+                <div
+                    className={cn(
+                        'flex items-center gap-1.5 text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border',
+                        theme === 'light'
+                            ? 'bg-violet-50 border-violet-200 text-violet-600'
+                            : 'bg-violet-500/10 border-violet-500/20 text-violet-400'
+                    )}
+                >
+                    <ShieldCheck size={11} />
+                    Secure AI Node
+                </div>
+            </header>
+
+            {/* ── Main Content ── */}
+            <main className="relative z-10 flex-1 flex items-center justify-center px-4 md:px-6 py-4 min-h-0">
+                <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.45 }}
+                    className={cn(
+                        'w-full max-w-4xl rounded-3xl shadow-2xl border backdrop-blur-md overflow-hidden flex flex-col md:flex-row',
+                        theme === 'light'
+                            ? 'bg-white/90 border-slate-200/70 shadow-slate-300/40'
+                            : 'bg-[#111113]/90 border-white/5 shadow-black/60'
+                    )}
+                >
+                    {/* ── Left Panel: Job info + Guidelines ── */}
+                    <div
+                        className={cn(
+                            'md:w-[42%] shrink-0 flex flex-col p-6 md:p-8 border-b md:border-b-0 md:border-r',
+                            theme === 'light'
+                                ? 'bg-gradient-to-b from-violet-50/80 to-white/40 border-slate-200/60'
+                                : 'bg-gradient-to-b from-violet-950/20 to-transparent border-white/5'
+                        )}
+                    >
+                        {/* Job card */}
+                        <div
+                            className={cn(
+                                'rounded-2xl p-4 border mb-5',
+                                theme === 'light'
+                                    ? 'bg-white border-slate-200/80 shadow-sm'
+                                    : 'bg-white/5 border-white/8'
+                            )}
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <h2 className="text-base font-bold tracking-tight leading-snug truncate">
+                                        {job.title}
+                                    </h2>
+                                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                        <span
+                                            className={cn(
+                                                'text-[11px] font-semibold px-2 py-0.5 rounded-full',
+                                                theme === 'light'
+                                                    ? 'bg-slate-100 text-slate-600'
+                                                    : 'bg-white/8 text-slate-300'
+                                            )}
+                                        >
+                                            {companyName}
+                                        </span>
+                                        <span
+                                            className={cn(
+                                                'text-[11px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1',
+                                                theme === 'light'
+                                                    ? 'bg-violet-50 text-violet-700'
+                                                    : 'bg-violet-500/15 text-violet-300'
+                                            )}
+                                        >
+                                            <Clock size={10} />
+                                            {job.durationMinutes || 15} mins
+                                        </span>
+                                    </div>
+                                </div>
+                                <div
+                                    className={cn(
+                                        'p-2.5 rounded-xl shrink-0',
+                                        theme === 'light'
+                                            ? 'bg-violet-100 text-violet-600'
+                                            : 'bg-violet-500/15 text-violet-400'
+                                    )}
+                                >
+                                    <Building2 size={18} />
+                                </div>
                             </div>
                         </div>
-                        <div className="p-3 rounded-2xl bg-violet-600/10 text-violet-600 dark:text-violet-400 shrink-0">
-                            <Building2 size={22} />
+
+                        {/* Guidelines */}
+                        <p
+                            className={cn(
+                                'text-[10px] font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5',
+                                theme === 'light' ? 'text-slate-400' : 'text-slate-500'
+                            )}
+                        >
+                            <AlertCircle size={11} /> Important Guidelines
+                        </p>
+                        <div className="flex flex-col gap-3 flex-1">
+                            {guidelines.map(({ Icon, title, body }, i) => (
+                                <div
+                                    key={i}
+                                    className={cn(
+                                        'flex items-start gap-3 p-3 rounded-xl border text-xs leading-relaxed',
+                                        theme === 'light'
+                                            ? 'bg-white border-slate-200 text-slate-600 shadow-sm'
+                                            : 'bg-white/5 border-white/8 text-slate-300'
+                                    )}
+                                >
+                                    <Icon
+                                        size={13}
+                                        className={cn(
+                                            'mt-0.5 shrink-0',
+                                            theme === 'light' ? 'text-violet-500' : 'text-violet-400'
+                                        )}
+                                    />
+                                    <div>
+                                        <span
+                                            className={cn(
+                                                'font-bold mr-1',
+                                                theme === 'light' ? 'text-slate-800' : 'text-slate-200'
+                                            )}
+                                        >
+                                            {title}:
+                                        </span>
+                                        {body}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
+
+                        {/* Footer note */}
+                        <p
+                            className={cn(
+                                'text-[9px] mt-4 leading-relaxed',
+                                theme === 'light' ? 'text-slate-400' : 'text-slate-600'
+                            )}
+                        >
+                            By entering, you consent to secure audio &amp; video processing for recruitment evaluations
+                            under compliance protocols.
+                        </p>
                     </div>
-                </div>
 
-                {/* Content Body */}
-                <div className="p-6 md:p-8 pt-5">
-                    <form onSubmit={handleJoin} className="space-y-6">
+                    {/* ── Right Panel: Form ── */}
+                    <div className="flex-1 flex flex-col justify-center p-6 md:p-8">
+                        {/* Heading */}
+                        <div className="mb-6">
+                            <h1 className="text-xl font-extrabold tracking-tight">
+                                Candidate Verification
+                            </h1>
+                            <p
+                                className={cn(
+                                    'text-xs mt-1',
+                                    theme === 'light' ? 'text-slate-500' : 'text-slate-400'
+                                )}
+                            >
+                                Enter your details to access the interview session.
+                            </p>
+                        </div>
 
-                        {/* Inputs */}
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-1">Full Name</label>
+                        <form onSubmit={handleJoin} className="flex flex-col gap-4">
+                            {/* Full Name */}
+                            <div>
+                                <label
+                                    className={cn(
+                                        'block text-[10px] font-bold uppercase tracking-widest mb-1.5 ml-1',
+                                        theme === 'light' ? 'text-slate-400' : 'text-slate-500'
+                                    )}
+                                >
+                                    Full Name
+                                </label>
                                 <input
                                     type="text"
                                     placeholder="Jane Doe"
                                     className={cn(
-                                        "w-full px-4 py-3 rounded-xl border outline-none transition-all duration-300 text-sm",
+                                        'w-full px-4 py-3 rounded-xl border outline-none transition-all duration-200 text-sm font-medium',
                                         theme === 'light'
-                                            ? "bg-slate-50 border-slate-200 focus:bg-white focus:ring-4 focus:ring-violet-500/10 focus:border-violet-600"
-                                            : "bg-[#1A1A1E] border-white/5 focus:bg-[#1A1A1E] focus:ring-4 focus:ring-violet-500/5 focus:border-violet-600 text-white"
+                                            ? 'bg-slate-50 border-slate-200 placeholder-slate-400 focus:bg-white focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500'
+                                            : 'bg-white/5 border-white/8 placeholder-slate-600 focus:bg-white/8 focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 text-white'
                                     )}
                                     value={name}
-                                    onChange={e => setName(e.target.value)}
+                                    onChange={(e) => setName(e.target.value)}
                                     required
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-1">Email Address</label>
+
+                            {/* Email */}
+                            <div>
+                                <label
+                                    className={cn(
+                                        'block text-[10px] font-bold uppercase tracking-widest mb-1.5 ml-1',
+                                        theme === 'light' ? 'text-slate-400' : 'text-slate-500'
+                                    )}
+                                >
+                                    Email Address
+                                </label>
                                 <input
                                     type="email"
                                     placeholder="jane.doe@example.com"
                                     className={cn(
-                                        "w-full px-4 py-3 rounded-xl border outline-none transition-all duration-300 text-sm",
+                                        'w-full px-4 py-3 rounded-xl border outline-none transition-all duration-200 text-sm font-medium',
                                         theme === 'light'
-                                            ? "bg-slate-50 border-slate-200 focus:bg-white focus:ring-4 focus:ring-violet-500/10 focus:border-violet-600"
-                                            : "bg-[#1A1A1E] border-white/5 focus:bg-[#1A1A1E] focus:ring-4 focus:ring-violet-500/5 focus:border-violet-600 text-white"
+                                            ? 'bg-slate-50 border-slate-200 placeholder-slate-400 focus:bg-white focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500'
+                                            : 'bg-white/5 border-white/8 placeholder-slate-600 focus:bg-white/8 focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 text-white'
                                     )}
                                     value={email}
-                                    onChange={e => {
+                                    onChange={(e) => {
                                         setEmail(e.target.value);
                                         if (joinError) setJoinError(null);
                                     }}
                                     required
                                 />
-                                {joinError && (
-                                    <motion.div 
-                                        initial={{ opacity: 0, y: -5 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="flex items-center gap-1.5 mt-1.5 text-xs font-semibold text-red-500 dark:text-red-400 ml-1 animate-pulse"
-                                    >
-                                        <AlertCircle size={14} className="shrink-0" />
-                                        <span>{joinError}</span>
-                                    </motion.div>
+                                <AnimatePresence>
+                                    {joinError && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -4 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -4 }}
+                                            className="flex items-center gap-1.5 mt-2 text-[11px] font-semibold text-red-500 ml-1"
+                                        >
+                                            <AlertCircle size={12} className="shrink-0" />
+                                            <span>{joinError}</span>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+
+                            {/* Divider */}
+                            <div
+                                className={cn(
+                                    'h-px',
+                                    theme === 'light' ? 'bg-slate-100' : 'bg-white/5'
                                 )}
-                            </div>
-                        </div>
+                            />
 
-                        {/* Candidate Guidelines & Interview Rules */}
-                        <div className={cn(
-                            "p-5 rounded-2xl border text-xs leading-relaxed space-y-4",
-                            theme === 'light'
-                                ? "bg-amber-50/60 border-amber-200/80 text-amber-900"
-                                : "bg-amber-950/10 border-amber-500/10 text-amber-200"
-                        )}>
-                            <div className="flex items-center gap-2 font-bold text-sm tracking-tight text-amber-700 dark:text-amber-400">
-                                <AlertCircle size={16} className="shrink-0" /> Important Candidate Guidelines
-                            </div>
-                            
-                            <div className="grid gap-3.5">
-                                <div className="flex items-start gap-2.5">
-                                    <Lock size={14} className="mt-0.5 shrink-0 opacity-80 text-amber-700 dark:text-amber-400" />
-                                    <div>
-                                        <span className="font-bold text-amber-950 dark:text-amber-300">Single-Attempt Session:</span> Once you enter the room, the session must be completed in one continuous sitting. Refreshing or leaving the page will lock you out and submit your current progress.
-                                    </div>
-                                </div>
-                                <div className="flex items-start gap-2.5">
-                                    <Video size={14} className="mt-0.5 shrink-0 opacity-80 text-amber-700 dark:text-amber-400" />
-                                    <div>
-                                        <span className="font-bold text-amber-950 dark:text-amber-300">Hardware Requirements:</span> Active camera and microphone permissions are required. Ensure your equipment is functional and tested before entering.
-                                    </div>
-                                </div>
-                                <div className="flex items-start gap-2.5">
-                                    <ShieldCheck size={14} className="mt-0.5 shrink-0 opacity-80 text-amber-700 dark:text-amber-400" />
-                                    <div>
-                                        <span className="font-bold text-amber-950 dark:text-amber-300">Evaluation Integrity:</span> The interview must be completed entirely by yourself. Background voice tracking and session monitoring are active to ensure authenticity.
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="space-y-3 pt-1">
+                            {/* Submit */}
                             <motion.button
                                 type="submit"
                                 disabled={isJoining}
-                                whileHover={{ y: -1, scale: 1.01 }}
+                                whileHover={{ y: -1, scale: 1.005 }}
                                 whileTap={{ scale: 0.99 }}
-                                className="w-full py-3.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-bold shadow-lg shadow-violet-500/20 border border-violet-500/30 flex items-center justify-center gap-2 transition-all disabled:opacity-70 disabled:cursor-not-allowed text-sm"
+                                className="w-full py-3.5 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white rounded-xl font-bold shadow-lg shadow-violet-500/25 border border-violet-500/30 flex items-center justify-center gap-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed text-sm"
                             >
                                 {isJoining ? (
                                     <>
-                                        <Loader2 className="animate-spin" size={16} /> Verifying Secure Connection...
+                                        <Loader2 className="animate-spin" size={16} />
+                                        Verifying Secure Connection...
                                     </>
                                 ) : (
                                     <>
-                                        Verify & Enter Interview Room <ArrowRight size={16} />
+                                        Verify &amp; Enter Interview Room
+                                        <ArrowRight size={16} />
                                     </>
                                 )}
                             </motion.button>
 
+                            {/* Test hardware */}
                             <button
                                 type="button"
                                 onClick={handleTestSystem}
                                 className={cn(
-                                    "w-full py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2",
-                                    theme === 'light' ? "text-slate-600 hover:bg-slate-100" : "text-slate-400 hover:bg-white/5"
+                                    'w-full py-2.5 rounded-xl font-semibold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 border',
+                                    theme === 'light'
+                                        ? 'text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                                        : 'text-slate-400 border-white/8 hover:bg-white/5'
                                 )}
                             >
-                                <Mic size={14} /> Run Hardware & Connection Check
+                                <Mic size={13} />
+                                Run Hardware &amp; Connection Check
                             </button>
-                        </div>
+                        </form>
+                    </div>
+                </motion.div>
+            </main>
 
-                    </form>
-                </div>
-            </motion.div>
-
-            <div className="mt-6 text-[10px] text-slate-400 dark:text-slate-500 text-center max-w-xs relative z-10 leading-relaxed">
-                By entering the interview room, you consent to secure audio and video processing for recruitment evaluations. Data is stored under compliance protocols.
-            </div>
-
+            {/* ── Hardware Test Modal ── */}
             <AnimatePresence>
                 {showTestModal && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        <motion.div 
+                        <motion.div
                             initial={{ opacity: 0 }}
-                            animate={{ opacity: 0.7 }}
+                            animate={{ opacity: 0.75 }}
                             exit={{ opacity: 0 }}
                             onClick={handleCloseTest}
                             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
                         />
-                        
-                        <motion.div 
-                            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 12 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 12 }}
                             className={cn(
-                                "relative w-full max-w-lg rounded-3xl p-6 md:p-8 shadow-2xl border z-10",
-                                theme === 'light' ? "bg-white border-slate-200/80" : "bg-[#121214] border-white/5"
+                                'relative w-full max-w-md rounded-3xl p-6 shadow-2xl border z-10',
+                                theme === 'light' ? 'bg-white border-slate-200/80' : 'bg-[#121214] border-white/5'
                             )}
                         >
-                            <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
-                                <ShieldCheck className="text-violet-600" size={20} /> Pre-Flight Hardware Preview
+                            <h3 className="text-base font-bold mb-1 flex items-center gap-2">
+                                <ShieldCheck className="text-violet-600" size={18} />
+                                Pre-Flight Hardware Preview
                             </h3>
-                            <p className={cn("text-xs mb-6 leading-relaxed", theme === 'light' ? "text-slate-500" : "text-slate-400")}>
-                                Confirm that your camera is clean, your microphone is capturing audio, and that your signal connection is healthy.
+                            <p
+                                className={cn(
+                                    'text-xs mb-5 leading-relaxed',
+                                    theme === 'light' ? 'text-slate-500' : 'text-slate-400'
+                                )}
+                            >
+                                Confirm your camera is clean, microphone is capturing audio, and your connection is
+                                healthy.
                             </p>
-                            
-                            <div className="mb-6">
-                                <MediaPreview 
+                            <div className="mb-5">
+                                <MediaPreview
                                     stream={mediaStream}
                                     isMuted={isMuted}
                                     onToggleMute={() => setIsMuted(!isMuted)}
                                     error={mediaError}
                                 />
                             </div>
-                            
-                            <button 
+                            <button
                                 type="button"
                                 onClick={handleCloseTest}
-                                className="w-full py-3.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-violet-500/20 border border-violet-500/30 transition-all active:scale-[0.98]"
+                                className="w-full py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-violet-500/20 border border-violet-500/30 transition-all active:scale-[0.98]"
                             >
-                                Pass Check & Return to Lobby
+                                Pass Check &amp; Return to Lobby
                             </button>
                         </motion.div>
                     </div>

@@ -7,6 +7,11 @@ import '../index.css';
 export const metadata = {
   title: 'AIcruiter - The AI Assistant for Recruitment',
   description: 'AI Interview screening assistant for modern recruiters.',
+  icons: {
+    icon: 'https://img.icons8.com/forma-thin/96/7950F2/bot.png',
+    shortcut: 'https://img.icons8.com/forma-thin/96/7950F2/bot.png',
+    apple: 'https://img.icons8.com/forma-thin/96/7950F2/bot.png',
+  },
 };
 
 export default function RootLayout({
@@ -18,6 +23,9 @@ export default function RootLayout({
     <html lang="en" className="light" suppressHydrationWarning>
       <head>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+        <link rel="icon" type="image/png" href="https://img.icons8.com/forma-thin/96/7950F2/bot.png" />
+        <link rel="shortcut icon" href="https://img.icons8.com/forma-thin/96/7950F2/bot.png" />
+        <link rel="apple-touch-icon" href="https://img.icons8.com/forma-thin/96/7950F2/bot.png" />
       </head>
       <body className="min-h-screen bg-background text-foreground selection:bg-purple-500/30">
         <Script

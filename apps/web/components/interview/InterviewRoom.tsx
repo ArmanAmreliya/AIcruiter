@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useParams, useLocation, useNavigate } from '../../lib/react-router-dom-compat';
-import { motion } from 'framer-motion';
-import { Mic, MicOff, PhoneOff, Video, VideoOff, Maximize2, ShieldCheck, Loader2, ArrowRight, Moon, Sun } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Mic, MicOff, PhoneOff, Video, VideoOff, Maximize2, ShieldCheck, Loader2, ArrowRight, Moon, Sun, AlertTriangle, WifiOff, RefreshCw, MessageCircleQuestion } from 'lucide-react';
 import { useAIInterviewer } from '../../hooks/useAIInterviewer';
 import { useTheme } from '../../context/ThemeContext';
 import { cn, parseJobDescription } from '../../lib/utils';
@@ -35,6 +35,14 @@ export const InterviewRoom = () => {
     const transcriptEndRef = useRef<HTMLDivElement>(null);
     const [micActive, setMicActive] = useState(true);
     const [videoActive, setVideoActive] = useState(true);
+    const [isOffline, setIsOffline] = useState(() => typeof window !== 'undefined' ? !window.navigator.onLine : false);
+    const [networkMessage, setNetworkMessage] = useState<string | null>(null);
+    const [voiceIssue, setVoiceIssue] = useState<string | null>(null);
+    const [audioLevel, setAudioLevel] = useState(0);
+    const [supportOpen, setSupportOpen] = useState(false);
+    const [supportIssueType, setSupportIssueType] = useState('technical');
+    const [supportDescription, setSupportDescription] = useState('');
+    const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
     const [job, setJob] = useState<any>(null);
 
@@ -146,6 +154,10 @@ export const InterviewRoom = () => {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
     const localStreamRef = useRef<MediaStream | null>(null);
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const analyserRef = useRef<AnalyserNode | null>(null);
+    const rafRef = useRef<number | null>(null);
+    const voiceWarningTimeoutRef = useRef<number | null>(null);
 
     // --- Initialize Camera (With audio-only fallback) ---
     useEffect(() => {
@@ -186,6 +198,126 @@ export const InterviewRoom = () => {
         };
     }, []);
 
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        const handleOffline = () => {
+            setIsOffline(true);
+            setNetworkMessage('Your connection dropped. Please check your internet and reload the page if the interview stalls.');
+        };
+
+        const handleOnline = () => {
+            setIsOffline(false);
+            setNetworkMessage(null);
+        };
+
+        const handleGlobalError = (event: ErrorEvent) => {
+            const message = event?.message || '';
+            if (message.toLowerCase().includes('failed to fetch') || message.toLowerCase().includes('networkerror')) {
+                setIsOffline(true);
+                setNetworkMessage('We detected a network disruption. Please wait a moment and refresh the page if the interview does not recover.');
+            }
+        };
+
+        const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+            const message = event?.reason?.message || String(event?.reason || '');
+            if (message.toLowerCase().includes('failed to fetch') || message.toLowerCase().includes('networkerror')) {
+                setIsOffline(true);
+                setNetworkMessage('We detected a network disruption. Please wait a moment and refresh the page if the interview does not recover.');
+            }
+        };
+
+        window.addEventListener('offline', handleOffline);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('error', handleGlobalError);
+        window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+        return () => {
+            window.removeEventListener('offline', handleOffline);
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('error', handleGlobalError);
+            window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!localStreamRef.current || !cameraReady || !micActive) {
+            setAudioLevel(0);
+            if (voiceWarningTimeoutRef.current) {
+                window.clearTimeout(voiceWarningTimeoutRef.current);
+                voiceWarningTimeoutRef.current = null;
+            }
+            setVoiceIssue(null);
+            return;
+        }
+
+        const stream = localStreamRef.current;
+        const AudioContextCtor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+        if (!AudioContextCtor) {
+            return;
+        }
+
+        const audioContext = new AudioContextCtor();
+        audioContextRef.current = audioContext;
+
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 32;
+        analyserRef.current = analyser;
+
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        const tick = () => {
+            if (!analyserRef.current) return;
+
+            analyserRef.current.getByteFrequencyData(dataArray as Uint8Array);
+            let sum = 0;
+            for (let index = 0; index < dataArray.length; index += 1) {
+                sum += dataArray[index];
+            }
+            const average = sum / dataArray.length;
+            const normalized = Math.min(100, (average / 128) * 100);
+            setAudioLevel(normalized);
+
+            const shouldWarn = micActive && normalized < 6;
+            if (shouldWarn) {
+                if (!voiceWarningTimeoutRef.current) {
+                    voiceWarningTimeoutRef.current = window.setTimeout(() => {
+                        setVoiceIssue('Your microphone is not picking up your voice clearly. Please check your mic permissions or input device.');
+                    }, 6000);
+                }
+            } else {
+                if (voiceWarningTimeoutRef.current) {
+                    window.clearTimeout(voiceWarningTimeoutRef.current);
+                    voiceWarningTimeoutRef.current = null;
+                }
+                setVoiceIssue(null);
+            }
+
+            rafRef.current = window.requestAnimationFrame(tick);
+        };
+
+        tick();
+
+        return () => {
+            if (rafRef.current) {
+                window.cancelAnimationFrame(rafRef.current);
+            }
+            if (voiceWarningTimeoutRef.current) {
+                window.clearTimeout(voiceWarningTimeoutRef.current);
+                voiceWarningTimeoutRef.current = null;
+            }
+            analyserRef.current = null;
+            if (audioContextRef.current) {
+                void audioContextRef.current.close();
+                audioContextRef.current = null;
+            }
+        };
+    }, [cameraReady, micActive]);
+
     // --- Sync Microphone Mute State ---
     useEffect(() => {
         if (localStreamRef.current) {
@@ -206,11 +338,22 @@ export const InterviewRoom = () => {
 
     const handleStartInterview = async () => {
         if (!job || isStartingInterview || hasStarted) return;
+
+        if (!window.navigator.onLine) {
+            setNetworkMessage('You appear to be offline. Please reconnect and refresh the page before starting the interview.');
+            toast.error('You are offline. Please reconnect and reload the page to continue.');
+            return;
+        }
+
         setIsStartingInterview(true);
         setHasStarted(true);
 
         try {
             await startInterview(localStreamRef.current || undefined);
+        } catch (error) {
+            console.error('Failed to start interview:', error);
+            setNetworkMessage('The interview could not start because the connection dropped. Please reload the page and try again.');
+            toast.error('The interview could not start. Please reload the page and try again.');
         } finally {
             setIsStartingInterview(false);
         }
@@ -226,6 +369,48 @@ export const InterviewRoom = () => {
         } else {
             setIsEndingInterview(false);
         }
+    };
+
+    const handleReloadPage = () => {
+        window.location.reload();
+    };
+
+    const handleSubmitSupportReport = (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!supportDescription.trim()) {
+            toast.error('Please describe the issue so we can review it.');
+            return;
+        }
+
+        setIsSubmittingReport(true);
+
+        const report = {
+            jobId,
+            candidateId,
+            candidateName,
+            issueType: supportIssueType,
+            description: supportDescription.trim(),
+            networkState: isOffline ? 'offline' : 'online',
+            voiceStatus: voiceIssue ? 'needs-attention' : 'healthy',
+            status,
+            timeLeft,
+            audioLevel,
+            timestamp: new Date().toISOString(),
+        };
+
+        if (typeof window !== 'undefined') {
+            const existingReports = window.sessionStorage.getItem('aicruiter_support_reports');
+            const parsedReports = existingReports ? JSON.parse(existingReports) : [];
+            const nextReports = Array.isArray(parsedReports) ? [...parsedReports, report] : [report];
+            window.sessionStorage.setItem('aicruiter_support_reports', JSON.stringify(nextReports));
+            console.info('Interview support report saved:', report);
+        }
+
+        setSupportOpen(false);
+        setSupportDescription('');
+        setSupportIssueType('technical');
+        toast.success('Support report saved. Our team will review it shortly.');
+        setIsSubmittingReport(false);
     };
 
     // --- Animation Variants for AI Orb ---
@@ -331,6 +516,48 @@ export const InterviewRoom = () => {
 
             {/* Main Container */}
             <div className="relative flex-1 overflow-y-auto p-4 md:p-6">
+                <AnimatePresence mode="wait">
+                    {(networkMessage || voiceIssue) && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className={cn(
+                                'mb-4 flex flex-wrap items-start justify-between gap-3 rounded-2xl border px-4 py-3 shadow-sm',
+                                isOffline
+                                    ? 'border-amber-300 bg-amber-50 text-amber-900'
+                                    : 'border-purple-200 bg-purple-50 text-purple-900'
+                            )}
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className={cn(
+                                    'mt-0.5 rounded-full p-2',
+                                    isOffline ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'
+                                )}>
+                                    {isOffline ? <WifiOff size={16} /> : <AlertTriangle size={16} />}
+                                </div>
+                                <div>
+                                    <div className="text-sm font-semibold">
+                                        {isOffline ? 'Connection issue detected' : 'Microphone check'}
+                                    </div>
+                                    <p className="text-sm leading-relaxed">
+                                        {networkMessage || voiceIssue}
+                                    </p>
+                                </div>
+                            </div>
+                            {isOffline && (
+                                <button
+                                    type="button"
+                                    onClick={handleReloadPage}
+                                    className="flex items-center gap-2 rounded-full border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+                                >
+                                    <RefreshCw size={14} /> Reload page
+                                </button>
+                            )}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
                 <div className="flex flex-col gap-4 md:gap-6 min-h-full">
                     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
 
@@ -578,6 +805,93 @@ export const InterviewRoom = () => {
                 </div>
                 </div>
             </div>
+
+            <button
+                type="button"
+                onClick={() => setSupportOpen(true)}
+                className="fixed bottom-4 right-4 z-[80] flex items-center gap-2 rounded-full border border-purple-500/20 bg-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-xl shadow-purple-950/20 transition hover:bg-purple-500 md:bottom-6 md:right-6"
+            >
+                <MessageCircleQuestion size={16} /> Help & Support
+            </button>
+
+            <AnimatePresence>
+                {supportOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.96, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.96, opacity: 0 }}
+                            className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
+                        >
+                            <div className="mb-5 flex items-start justify-between gap-3">
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-900">Need help with the interview?</h3>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        Share what happened and we will review it right away.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setSupportOpen(false)}
+                                    className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleSubmitSupportReport} className="space-y-4">
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">Issue type</label>
+                                    <select
+                                        value={supportIssueType}
+                                        onChange={(event) => setSupportIssueType(event.target.value)}
+                                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-purple-500 focus:bg-white"
+                                    >
+                                        <option value="technical">Technical issue</option>
+                                        <option value="audio">Audio / microphone</option>
+                                        <option value="network">Connection / network</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">Description</label>
+                                    <textarea
+                                        value={supportDescription}
+                                        onChange={(event) => setSupportDescription(event.target.value)}
+                                        rows={5}
+                                        placeholder="Tell us what happened, when it started, and what you were doing when the problem appeared."
+                                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-purple-500 focus:bg-white"
+                                    />
+                                </div>
+
+                                <div className="flex justify-end gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSupportOpen(false)}
+                                        className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={isSubmittingReport}
+                                        className="flex items-center gap-2 rounded-full bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-purple-400"
+                                    >
+                                        {isSubmittingReport ? <Loader2 size={16} className="animate-spin" /> : null}
+                                        Save report
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     </div>
     );

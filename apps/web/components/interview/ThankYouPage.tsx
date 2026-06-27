@@ -1,22 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Star, MessageSquare, ArrowRight, Heart, Home } from 'lucide-react';
+import { CheckCircle2, Star, ArrowRight, Home, Heart } from 'lucide-react';
 import { useNavigate, useLocation, useSearchParams } from '../../lib/react-router-dom-compat';
-import { useTheme } from '../../context/ThemeContext';
 import { cn } from '../../lib/utils';
 import { toast } from 'sonner';
-import { supabase } from '../../lib/supabase';
 import { apolloClient } from '../../lib/apollo-client';
 import { UPDATE_CANDIDATE_INTERVIEW_STATUS } from '../../lib/graphql-queries';
 
 export const ThankYouPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { theme, setTheme } = useTheme();
-
-    useEffect(() => {
-        setTheme('light');
-    }, [setTheme]);
+    // keep page styling local; do not force global theme changes
 
     const [searchParams] = useSearchParams();
     const candidateId = searchParams.get('candidateId') || location.state?.candidateId;
@@ -44,9 +38,8 @@ export const ThankYouPage = () => {
                             metaData: JSON.stringify(meta)
                         }
                     });
-                    console.log("Candidate interview auto-completed on mount.");
                 } catch (err) {
-                    console.error("Error auto-completing interview on mount:", err);
+                    console.error('Error auto-completing interview on mount:', err);
                 }
             }
         };
@@ -60,13 +53,12 @@ export const ThankYouPage = () => {
 
     const handleSubmitFeedback = async () => {
         if (rating === 0) {
-            toast.error("Please select a rating before submitting.");
+            toast.error('Please select a rating before submitting.');
             return;
         }
 
         setIsSubmitting(true);
         try {
-            // Update candidate status to COMPLETED and save feedback via GraphQL
             if (candidateId) {
                 const meta = {
                     exit_type: exitType,
@@ -87,10 +79,10 @@ export const ThankYouPage = () => {
             }
 
             setSubmitted(true);
-            toast.success("Thank you for your feedback!");
+            toast.success('Thank you for your feedback!');
         } catch (error: any) {
-            console.error("Feedback error:", error);
-            toast.error("Failed to save feedback, but your interview was submitted.");
+            console.error('Feedback error:', error);
+            toast.error('Failed to save feedback, but your interview was submitted.');
             setSubmitted(true);
         } finally {
             setIsSubmitting(false);
@@ -98,118 +90,120 @@ export const ThankYouPage = () => {
     };
 
     return (
-        <div className={cn(
-            "min-h-screen flex flex-col items-center justify-center p-6 font-sans transition-colors duration-500",
-            theme === 'light' ? "bg-gray-50 text-gray-900" : "bg-black text-white"
-        )}>
-
-            {/* Background Glow */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-purple-600/10 blur-[120px] pointer-events-none" />
-
+        <div
+            className={cn(
+                'min-h-screen w-screen fixed inset-0 flex items-center justify-center p-6 font-sans',
+                'bg-gray-50 text-gray-900'
+            )}
+            style={{
+                overflow: 'hidden'
+            }}
+        >
             <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
+                initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.28 }}
                 className={cn(
-                    "w-full max-w-xl p-8 md:p-12 rounded-[2.5rem] shadow-2xl relative z-10 border text-center",
-                    theme === 'light' ? "bg-white border-gray-100" : "bg-zinc-900 border-white/5"
+                    'w-full max-w-2xl p-8 rounded-2xl shadow-sm relative z-10',
+                    'bg-white border border-gray-100'
                 )}
             >
                 {!submitted ? (
                     <>
-                        <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: "spring", damping: 12 }}
-                            className="w-20 h-20 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center mx-auto mb-8"
-                        >
-                            <CheckCircle2 size={40} />
-                        </motion.div>
+                        <div className="flex flex-col items-center gap-3 text-center">
+                            <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center">
+                                <CheckCircle2 size={28} className="text-purple-600" />
+                            </div>
+                            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Interview Completed</h1>
+                            <p className="text-sm text-gray-600 max-w-prose">
+                                Your interview was recorded and securely submitted to the recruiter. Thank you for your time.
+                            </p>
+                        </div>
 
-                        <h1 className="text-4xl font-bold mb-4 tracking-tight">Interview Completed!</h1>
-                        <p className={cn("text-lg mb-10", theme === 'light' ? "text-gray-500" : "text-gray-400")}>
-                            Your session has been recorded and sent to the recruiter. We'd love to hear about your experience.
-                        </p>
-
-                        <div className="space-y-8">
-                            {/* Rating Section */}
-                            <div className="space-y-4">
-                                <p className="text-sm font-bold uppercase tracking-widest opacity-50">Rate your experience</p>
-                                <div className="flex justify-center gap-3">
+                        <div className="mt-8 space-y-6">
+                            <div className="text-center">
+                                <p className="text-xs font-bold uppercase opacity-90 tracking-wide mb-3">Rate your experience</p>
+                                <div className="flex items-center justify-center gap-3">
                                     {[1, 2, 3, 4, 5].map((star) => (
                                         <button
                                             key={star}
                                             onClick={() => setRating(star)}
                                             className={cn(
-                                                "p-2 transition-all transform hover:scale-120",
-                                                rating >= star ? "text-yellow-400" : "text-gray-300 dark:text-gray-700"
+                                                'text-2xl transition-transform transform hover:scale-110',
+                                                rating >= star ? 'text-yellow-400' : 'text-gray-300'
                                             )}
                                         >
-                                            <Star size={32} fill={rating >= star ? "currentColor" : "none"} />
+                                            <Star size={24} fill={rating >= star ? 'currentColor' : 'none'} />
                                         </button>
                                     ))}
                                 </div>
                             </div>
 
-                            {/* Feedback Text */}
-                            <div className="space-y-4">
-                                <p className="text-sm font-bold uppercase tracking-widest opacity-50">Additional Comments</p>
+                            <div>
+                                <label className="block text-sm font-medium mb-2 text-gray-700">Additional comments</label>
                                 <textarea
                                     value={feedback}
                                     onChange={(e) => setFeedback(e.target.value)}
-                                    placeholder="How was the AI interaction? Any technical issues?"
+                                    placeholder="Tell us about the experience or any technical issues."
                                     className={cn(
-                                        "w-full px-5 py-4 rounded-3xl outline-none border transition-all min-h-[120px] resize-none",
-                                        theme === 'light'
-                                            ? "bg-gray-50 border-gray-100 focus:bg-white focus:ring-4 focus:ring-purple-50"
-                                            : "bg-black/40 border-white/10 focus:bg-black focus:border-purple-500/50"
+                                        'w-full min-h-[100px] rounded-lg px-3 py-2 outline-none resize-none',
+                                        'bg-white border border-gray-100 text-gray-800 placeholder-gray-400'
                                     )}
                                 />
                             </div>
 
-                            <button
-                                disabled={isSubmitting}
-                                onClick={handleSubmitFeedback}
-                                className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold text-lg shadow-xl shadow-purple-600/20 transition-all transform active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                {isSubmitting ? "Submitting..." : "Submit Review"}
-                                <ArrowRight size={20} />
-                            </button>
+                            <div className="flex items-center justify-center gap-4 mt-4">
+                                <button
+                                    disabled={isSubmitting}
+                                    onClick={handleSubmitFeedback}
+                                    className={cn(
+                                        'flex items-center gap-2 px-5 py-2 rounded-md font-semibold',
+                                        'bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60'
+                                    )}
+                                >
+                                    <ArrowRight size={16} className="opacity-90" />
+                                    <span>{isSubmitting ? 'Submitting...' : 'Submit Review'}</span>
+                                </button>
+
+                                <button
+                                    onClick={() => navigate('/')}
+                                    className={cn(
+                                        'px-4 py-2 rounded-md font-medium border border-gray-200 text-gray-700 flex items-center gap-2',
+                                        'bg-white hover:bg-gray-50'
+                                    )}
+                                >
+                                    <Home size={16} className="text-gray-600" />
+                                    <span>Return Home</span>
+                                </button>
+                            </div>
                         </div>
                     </>
                 ) : (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="py-8"
-                    >
-                        <div className="w-20 h-20 rounded-full bg-purple-500/10 text-purple-500 flex items-center justify-center mx-auto mb-8">
-                            <Heart size={40} fill="currentColor" />
+                    <div className="py-8 text-center">
+                        <div className="w-16 h-16 rounded-full bg-purple-50 flex items-center justify-center mx-auto mb-4">
+                            <Heart size={28} className="text-purple-600" />
                         </div>
-                        <h2 className="text-3xl font-bold mb-4">You're all set!</h2>
-                        <p className={cn("text-lg mb-10", theme === 'light' ? "text-gray-500" : "text-gray-400")}>
-                            Thank you for helping us improve AIcruiter. The recruiter will be in touch soon regarding next steps.
+                        <h2 className="text-xl font-semibold mb-2 text-gray-900">You're all set!</h2>
+                        <p className="text-sm text-gray-600 mb-6">
+                            Thank you for completing the interview. The recruiter will be in touch with next steps.
                         </p>
-                        <button
-                            onClick={() => navigate('/')}
-                            className={cn(
-                                "px-8 py-4 rounded-2xl font-bold flex items-center gap-2 mx-auto transition-all",
-                                theme === 'light' ? "bg-black text-white" : "bg-white text-black hover:bg-gray-200"
-                            )}
-                        >
-                            <Home size={20} />
-                            Return Home
-                        </button>
-                    </motion.div>
+                        <div className="flex items-center justify-center">
+                            <button
+                                onClick={() => navigate('/')}
+                                className={cn(
+                                    'px-5 py-2 rounded-md font-semibold flex items-center gap-2',
+                                    'bg-purple-600 text-white hover:bg-purple-700'
+                                )}
+                            >
+                                <Home size={16} />
+                                <span>Return Home</span>
+                            </button>
+                        </div>
+                    </div>
                 )}
             </motion.div>
-
-            <div className="mt-12 text-sm opacity-40 flex items-center gap-2">
-                <span>Powered by</span>
-                <div className="flex items-center gap-1 font-bold">
-                    <div className="w-4 h-4 rounded bg-purple-600 flex items-center justify-center text-[8px] text-white">AI</div>
-                    <span>AIcruiter</span>
-                </div>
-            </div>
         </div>
     );
 };
+
+export default ThankYouPage;

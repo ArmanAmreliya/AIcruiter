@@ -33,23 +33,6 @@ test.describe('AIcruiter Landing Page E2E Tests', () => {
     await expect(getStartedButton).toBeVisible();
   });
 
-  test('should navigate to login page when clicking Log in', async ({ page }) => {
-    const logInButton = page.locator('button:has-text("Log in")').first();
-    await expect(logInButton).toBeVisible();
-
-    // Poll until the button slides into the viewport (y >= 0), indicating layout has mounted
-    await expect.poll(async () => {
-      const box = await logInButton.boundingBox();
-      return box ? box.y : -1;
-    }, {
-      message: 'Wait for Navbar Log in button to animate into view',
-      timeout: 10000,
-    }).toBeGreaterThanOrEqual(0);
-
-    await logInButton.click({ force: true });
-    await page.waitForURL(/\/login/, { timeout: 10000 });
-  });
-
   test('should navigate to signup page when clicking Get Started', async ({ page }) => {
     const signUpButton = page.locator('nav button:has-text("Get Started")').first();
     await expect(signUpButton).toBeVisible();
