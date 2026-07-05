@@ -14,6 +14,8 @@ const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(__dirname),
   env: {
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
     NEXT_SUPABASE_URL: process.env.NEXT_SUPABASE_URL,
     NEXT_SUPABASE_ANON_KEY: process.env.NEXT_SUPABASE_ANON_KEY,
     VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL,
@@ -23,6 +25,9 @@ const nextConfig = {
     GROQ_API_KEY: process.env.GROQ_API_KEY,
     NEXT_AI_API_KEY: process.env.NEXT_AI_API_KEY,
     VITE_AI_API_KEY: process.env.VITE_AI_API_KEY,
+    NEXT_DEEPGRAM_API_KEY: process.env.NEXT_DEEPGRAM_API_KEY,
+    NEXT_REPORT_API_KEY: process.env.NEXT_REPORT_API_KEY,
+    DAILY_ROOM_URL: process.env.DAILY_ROOM_URL,
   },
 };
 
