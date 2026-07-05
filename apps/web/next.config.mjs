@@ -12,7 +12,7 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 const nextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   output: "standalone",
-  outputFileTracingRoot: path.resolve(__dirname, "../.."),
+  outputFileTracingRoot: path.resolve(__dirname),
   env: {
     NEXT_SUPABASE_URL: process.env.NEXT_SUPABASE_URL,
     NEXT_SUPABASE_ANON_KEY: process.env.NEXT_SUPABASE_ANON_KEY,
