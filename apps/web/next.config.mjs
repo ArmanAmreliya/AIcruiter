@@ -12,7 +12,7 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 const nextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   output: "standalone",
-  outputFileTracingRoot: path.resolve(__dirname),
+  outputFileTracingRoot: path.resolve(__dirname, "../.."),
   env: {
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
       process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
