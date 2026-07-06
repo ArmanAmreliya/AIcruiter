@@ -1,6 +1,5 @@
 import { SSTConfig } from "sst";
-import { Api, NextjsSite, Queue, Function } from "sst/constructs";
-import { Certificate } from "aws-cdk-lib/aws-certificatemanager";
+import { Api, Queue, Function } from "sst/constructs";
 
 export default {
   config(_input) {
@@ -53,38 +52,10 @@ export default {
         },
       });
 
-      // 3. Next.js Web App Site
-      const web = new NextjsSite(stack, "web", {
-        path: "apps/web",
-        customDomain: {
-          domainName: "aicruiter.me",
-          isExternalDomain: true,
-          cdk: {
-            certificate: Certificate.fromCertificateArn(
-              stack,
-              "NextjsSiteCert",
-              "arn:aws:acm:us-east-1:520900723137:certificate/68ae5ad3-0467-427b-906c-ea06ac1ea06e"
-            ),
-          },
-        },
-        environment: {
-          NEXT_PUBLIC_API_URL: api.url,
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "",
-          CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY || "",
-          DATABASE_URL: process.env.DATABASE_URL || "",
-          NEXT_SUPABASE_URL: process.env.NEXT_SUPABASE_URL || "",
-          NEXT_SUPABASE_ANON_KEY: process.env.NEXT_SUPABASE_ANON_KEY || "",
-          NEXT_DEEPGRAM_API_KEY: process.env.NEXT_DEEPGRAM_API_KEY || "",
-          DAILY_API_KEY: process.env.DAILY_API_KEY || "",
-          DAILY_ROOM_URL: process.env.DAILY_ROOM_URL || "",
-          NEXT_AI_API_KEY: process.env.NEXT_AI_API_KEY || "",
-          NEXT_REPORT_API_KEY: process.env.NEXT_REPORT_API_KEY || "",
-        },
-      });
-
+      // Note: Next.js (apps/web) is deployed via Vercel.
+      // Only the API and Queue are managed here in AWS.
       stack.addOutputs({
         ApiUrl: api.url,
-        SiteUrl: web.url,
       });
     });
   },
