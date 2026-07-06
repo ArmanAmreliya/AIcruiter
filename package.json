@@ -23,6 +23,13 @@
       "aws-cdk-lib": "2.224.0",
       "constructs": "10.3.0"
     },
+    "onlyBuiltDependencies": [
+      "prisma",
+      "@prisma/client",
+      "@prisma/engines",
+      "esbuild",
+      "sharp"
+    ],
     "auditConfig": {
       "ignoreCves": [
         "GHSA-jx2c-rxcm-jvmq"
