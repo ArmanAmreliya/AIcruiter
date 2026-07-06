@@ -79,6 +79,12 @@ importers:
 
   apps/web:
     dependencies:
+      '@aicruiter/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@aicruiter/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@apollo/client':
         specifier: ^4.2.3
         version: 4.2.3(graphql@16.14.2)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(rxjs@7.8.2)

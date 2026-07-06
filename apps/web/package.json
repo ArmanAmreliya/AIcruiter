@@ -11,6 +11,8 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@aicruiter/db": "workspace:*",
+    "@aicruiter/types": "workspace:*",
     "@apollo/client": "^4.2.3",
     "@clerk/nextjs": "^7.5.7",
     "@deepgram/sdk": "^4.11.3",
