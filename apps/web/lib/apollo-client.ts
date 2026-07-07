@@ -1,8 +1,24 @@
 import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined' && (window as any).NEXT_PUBLIC_API_URL) {
+    return (window as any).NEXT_PUBLIC_API_URL.replace(/\/graphql$/i, '');
+  }
+
+  if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/graphql$/i, '');
+  }
+
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return 'http://localhost:4000';
+  }
+
+  return '';
+};
+
 const httpLink = createHttpLink({
-  uri: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql',
+  uri: `${getApiBaseUrl()}/graphql` || 'http://localhost:4000/graphql',
 });
 
 const authLink = setContext(async (_, { headers }) => {

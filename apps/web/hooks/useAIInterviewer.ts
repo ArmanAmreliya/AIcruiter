@@ -346,16 +346,19 @@ ${promptDetails}
         }
 
         try {
-            const defaultUrl = 'http://localhost:4000';
-            let apiUrl = defaultUrl;
+            let apiUrl = '';
             if (typeof window !== 'undefined') {
                 if ((window as any).NEXT_PUBLIC_API_URL) {
                     apiUrl = (window as any).NEXT_PUBLIC_API_URL.replace('/graphql', '');
-                } else {
-                    apiUrl = `http://${window.location.hostname}:4000`;
+                } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    apiUrl = 'http://localhost:4000';
                 }
             } else if (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_API_URL) {
                 apiUrl = process.env.NEXT_PUBLIC_API_URL.replace('/graphql', '');
+            }
+
+            if (!apiUrl) {
+                throw new Error('NEXT_PUBLIC_API_URL is not configured for this environment.');
             }
 
             const { persona } = parseJobDescription(contextRef.current.jobDescription);
@@ -448,16 +451,19 @@ ${promptDetails}
         }
 
         try {
-            const defaultUrl = 'http://localhost:4000';
-            let apiUrl = defaultUrl;
+            let apiUrl = '';
             if (typeof window !== 'undefined') {
                 if ((window as any).NEXT_PUBLIC_API_URL) {
                     apiUrl = (window as any).NEXT_PUBLIC_API_URL.replace('/graphql', '');
-                } else {
-                    apiUrl = `http://${window.location.hostname}:4000`;
+                } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    apiUrl = 'http://localhost:4000';
                 }
             } else if (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_API_URL) {
                 apiUrl = process.env.NEXT_PUBLIC_API_URL.replace('/graphql', '');
+            }
+
+            if (!apiUrl) {
+                throw new Error('NEXT_PUBLIC_API_URL is not configured for this environment.');
             }
 
             const { persona } = parseJobDescription(contextRef.current.jobDescription);

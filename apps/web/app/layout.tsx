@@ -19,6 +19,14 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+  const isProductionRuntime = process.env.NODE_ENV === 'production' || process.env.SST_STAGE === 'prod';
+  const isUsingDevelopmentClerkKey = clerkPublishableKey.startsWith('pk_test_') || clerkPublishableKey.startsWith('pk_dev_');
+
+  if (isProductionRuntime && isUsingDevelopmentClerkKey) {
+    throw new Error('Production deployments must use a live Clerk publishable key starting with pk_live_.');
+  }
+
   return (
     <html lang="en" className="light" suppressHydrationWarning>
       <head>
@@ -39,7 +47,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-background text-foreground selection:bg-purple-500/30">
         {/* @ts-expect-error Server Component */}
-        <ClerkProvider>
+        <ClerkProvider publishableKey={clerkPublishableKey}>
           <ClientProviders>
             {children}
           </ClientProviders>

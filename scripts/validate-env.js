@@ -41,6 +41,12 @@ if (urlErrors.length > 0) {
 
 const clerkKey = process.env.CLERK_SECRET_KEY;
 const clerkPubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+const isProductionEnv =
+  process.env.NODE_ENV === "production" ||
+  process.env.SST_STAGE === "prod" ||
+  process.env.VERCEL_ENV === "production";
+const isCiEnv = process.env.CI === "true";
+
 if (!clerkKey.startsWith("sk_") || !clerkPubKey.startsWith("pk_")) {
   console.error("❌ Clerk keys appear invalid.");
   console.error(
@@ -50,6 +56,19 @@ if (!clerkKey.startsWith("sk_") || !clerkPubKey.startsWith("pk_")) {
     `  - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${clerkPubKey.startsWith("pk_") ? "ok" : "invalid"}`,
   );
   process.exit(1);
+}
+
+if (isProductionEnv && !isCiEnv) {
+  if (!clerkKey.startsWith("sk_live_") || !clerkPubKey.startsWith("pk_live_")) {
+    console.error("❌ Production deployments require live Clerk keys.");
+    console.error(
+      `  - CLERK_SECRET_KEY=${clerkKey.startsWith("sk_live_") ? "ok" : "invalid"}`,
+    );
+    console.error(
+      `  - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${clerkPubKey.startsWith("pk_live_") ? "ok" : "invalid"}`,
+    );
+    process.exit(1);
+  }
 }
 
 console.log("✅ Environment validation passed.");
