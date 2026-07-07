@@ -26,11 +26,9 @@ export default function RootLayout({
         <link rel="icon" type="image/png" href="https://img.icons8.com/forma-thin/96/7950F2/bot.png" />
         <link rel="shortcut icon" href="https://img.icons8.com/forma-thin/96/7950F2/bot.png" />
         <link rel="apple-touch-icon" href="https://img.icons8.com/forma-thin/96/7950F2/bot.png" />
-      </head>
-      <body className="min-h-screen bg-background text-foreground selection:bg-purple-500/30">
-        <Script
+        {/* Inline env vars as a plain <script> to avoid next/script beforeInteractive chunk issues */}
+        <script
           id="runtime-env"
-          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: `
             window.__SUPABASE_URL__ = ${JSON.stringify(process.env.NEXT_SUPABASE_URL || process.env.VITE_SUPABASE_URL)};
             window.__SUPABASE_ANON_KEY__ = ${JSON.stringify(process.env.NEXT_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY)};
@@ -38,6 +36,8 @@ export default function RootLayout({
             window.__NEXT_AI_API_KEY__ = ${JSON.stringify(process.env.NEXT_AI_API_KEY || process.env.VITE_AI_API_KEY || process.env.NEXT_GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY)};
           ` }}
         />
+      </head>
+      <body className="min-h-screen bg-background text-foreground selection:bg-purple-500/30">
         {/* @ts-expect-error Server Component */}
         <ClerkProvider>
           <ClientProviders>
