@@ -20,11 +20,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
-  const isProductionRuntime = process.env.NODE_ENV === 'production' || process.env.SST_STAGE === 'prod';
+  const isProductionRuntime = process.env.NODE_ENV === 'production' || process.env.SST_STAGE === 'prod' || process.env.VERCEL_ENV === 'production';
+  const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
   const isUsingDevelopmentClerkKey = clerkPublishableKey.startsWith('pk_test_') || clerkPublishableKey.startsWith('pk_dev_');
 
-  if (isProductionRuntime && isUsingDevelopmentClerkKey) {
+  if (isProductionRuntime && isUsingDevelopmentClerkKey && !isBuildPhase) {
     throw new Error('Production deployments must use a live Clerk publishable key starting with pk_live_.');
+  }
+
+  if (isProductionRuntime && isUsingDevelopmentClerkKey && isBuildPhase) {
+    console.warn('Clerk is using a development publishable key during production build. Set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to a pk_live_ value for deployment.');
   }
 
   return (
