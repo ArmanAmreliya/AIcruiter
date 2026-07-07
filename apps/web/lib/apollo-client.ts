@@ -1,24 +1,24 @@
 import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 
-const getApiBaseUrl = () => {
-  if (typeof window !== 'undefined' && (window as any).NEXT_PUBLIC_API_URL) {
-    return (window as any).NEXT_PUBLIC_API_URL.replace(/\/graphql$/i, '');
+// Resolve the API base URL with a clear priority order.
+// NEXT_PUBLIC_* vars are baked into the client bundle at build time by Next.js.
+// We must NOT rely on window-based detection at module level because:
+//   1. The module loads during SSR where window is undefined.
+//   2. `${''}/graphql` = '/graphql' which is truthy, so the || fallback never fires.
+const resolveApiUrl = (): string => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl) {
+    return `${envUrl.replace(/\/graphql$/i, '')}/graphql`;
   }
-
-  if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL.replace(/\/graphql$/i, '');
-  }
-
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return 'http://localhost:4000';
-  }
-
-  return '';
+  // Default to localhost for local development
+  return 'http://localhost:4000/graphql';
 };
 
+const GRAPHQL_URI = resolveApiUrl();
+
 const httpLink = createHttpLink({
-  uri: `${getApiBaseUrl()}/graphql` || 'http://localhost:4000/graphql',
+  uri: GRAPHQL_URI,
 });
 
 const authLink = setContext(async (_, { headers }) => {
