@@ -40,3 +40,5 @@ blob-report/
 playwright/.clerk/
 .playwright/
 
+.vercel
+.env*.local
