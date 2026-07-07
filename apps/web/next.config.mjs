@@ -11,8 +11,9 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
-  output: "standalone",
-  outputFileTracingRoot: path.resolve(__dirname),
+  // NOTE: Do NOT add output: "standalone" or outputFileTracingRoot here.
+  // Vercel manages its own output format. Standalone mode causes MIDDLEWARE_INVOCATION_FAILED
+  // and 404 errors on both localhost and production.
   env: {
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
       process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
