@@ -138,6 +138,16 @@ const typeDefs = `#graphql
     createdAt: String!
     updatedAt: String!
     job: Job
+    transcripts: [InterviewTranscript!]
+  }
+
+  type InterviewTranscript {
+    id: ID!
+    jobId: ID!
+    candidateId: ID!
+    userText: String!
+    aiText: String!
+    createdAt: String!
   }
 
   type Activity {
@@ -259,13 +269,26 @@ const resolvers = {
       return typeof parent.metaData === 'string' ? parent.metaData : JSON.stringify(parent.metaData);
     },
     overallScore: (parent: any) => {
-      if (parent.metaData && typeof parent.metaData === 'object') {
-        return (parent.metaData as any).overallScore || (parent.metaData as any).score || 0;
+      let meta: any = {};
+      if (parent.metaData) {
+        try {
+          meta = typeof parent.metaData === 'string' ? JSON.parse(parent.metaData) : parent.metaData;
+        } catch (e) {}
       }
-      return 0;
+      return meta.overallScore || meta.score || 0;
     },
     createdAt: (parent: any) => parent.createdAt?.toISOString(),
-    updatedAt: (parent: any) => parent.updatedAt?.toISOString()
+    updatedAt: (parent: any) => parent.updatedAt?.toISOString(),
+    transcripts: async (parent: any) => {
+      return prisma.interviewTranscript.findMany({
+        where: { candidateId: parent.id },
+        orderBy: { createdAt: 'asc' }
+      });
+    }
+  },
+
+  InterviewTranscript: {
+    createdAt: (parent: any) => parent.createdAt?.toISOString()
   },
 
   Activity: {

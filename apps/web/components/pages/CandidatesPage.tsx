@@ -21,7 +21,8 @@ import {
   BookOpen,
   Download,
   ArrowUpDown,
-  ChevronDown
+  ChevronDown,
+  MessageSquare
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { cn } from '../../lib/utils';
@@ -52,6 +53,12 @@ interface Candidate {
     time_spent?: number;
     completed_at?: string;
   };
+  transcripts?: {
+    id: string;
+    userText: string;
+    aiText: string;
+    createdAt: string;
+  }[];
 }
 
 const formatDate = (dateInput?: any) => {
@@ -249,7 +256,8 @@ export const CandidatesPage = () => {
             appliedDate: c.createdAt || new Date().toISOString(),
             jobId: c.jobId,
             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name || 'User')}&background=7C3AED&color=fff`,
-            metaData: parsedMeta
+            metaData: parsedMeta,
+            transcripts: c.transcripts || []
           };
         });
         setCandidates(formattedCandidates);
@@ -814,6 +822,39 @@ export const CandidatesPage = () => {
                       <p className="whitespace-pre-line font-medium">{selectedCandidate.metaData.feedback}</p>
                     ) : (
                       <p className="italic text-slate-400 dark:text-zinc-500 text-center py-4">No AI report generated yet. The candidate might still be in progress or completed without recording dialogue tracks.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Interview Transcript */}
+                <div className="space-y-2">
+                  <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
+                    <MessageSquare size={14} className="text-purple-500" />
+                    Complete Interview Dialogue Transcript
+                  </span>
+                  <div className={cn(
+                    "p-5 rounded-2xl border text-xs max-h-60 overflow-y-auto space-y-3.5 font-sans scrollbar-thin",
+                    theme === 'light' ? "bg-slate-50 border-slate-200/60 shadow-sm" : "bg-black/25 border-white/5"
+                  )}>
+                    {selectedCandidate.transcripts && selectedCandidate.transcripts.length > 0 ? (
+                      selectedCandidate.transcripts.map((t: any, idx: number) => (
+                        <div key={t.id || idx} className="space-y-2 pb-2.5 last:pb-0 border-b last:border-0 border-dashed border-slate-200/50 dark:border-zinc-800/80">
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-start gap-1.5">
+                              <span className="font-bold text-purple-650 dark:text-purple-450 shrink-0">Interviewer:</span>
+                              <span className={theme === 'light' ? "text-slate-700 font-medium" : "text-gray-300 font-medium"}>{t.aiText}</span>
+                            </div>
+                            {t.userText && (
+                              <div className="flex items-start gap-1.5 mt-0.5 pl-3 border-l-2 border-slate-300 dark:border-zinc-700">
+                                <span className="font-bold text-slate-500 dark:text-gray-400 shrink-0">Candidate:</span>
+                                <span className={theme === 'light' ? "text-slate-800 font-semibold" : "text-white font-semibold"}>{t.userText}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="italic text-slate-400 dark:text-zinc-500 text-center py-4">No dialogue transcripts recorded for this candidate.</p>
                     )}
                   </div>
                 </div>

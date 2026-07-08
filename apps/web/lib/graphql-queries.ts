@@ -113,6 +113,12 @@ export const GET_CANDIDATES = gql`
       job {
         title
       }
+      transcripts {
+        id
+        userText
+        aiText
+        createdAt
+      }
     }
   }
 `;
