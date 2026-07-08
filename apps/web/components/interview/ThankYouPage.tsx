@@ -23,7 +23,7 @@ export const ThankYouPage = () => {
     // Automatically mark the candidate interview as COMPLETED on mount
     useEffect(() => {
         const markInterviewCompleted = async () => {
-            if (candidateId) {
+            if (candidateId && candidateId !== 'guest') {
                 try {
                     const meta = {
                         exit_type: exitType,
@@ -59,7 +59,7 @@ export const ThankYouPage = () => {
 
         setIsSubmitting(true);
         try {
-            if (candidateId) {
+            if (candidateId && candidateId !== 'guest') {
                 const meta = {
                     exit_type: exitType,
                     time_spent: timeSpent,

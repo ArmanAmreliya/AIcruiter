@@ -60,7 +60,14 @@ export const useAIInterviewer = (
     const accumulatedTranscriptRef = useRef('');
     const activeAudioRef = useRef<HTMLAudioElement | null>(null);
     const keepAliveTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const originalTrackStatesRef = useRef<Map<string, boolean>>(new Map());
+    const isReconnectingRef = useRef(false);
+    const audioBufferRef = useRef<Blob[]>([]);
+    const speakingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const candidateIdRef = useRef(candidateId);
+
+    useEffect(() => {
+        candidateIdRef.current = candidateId;
+    }, [candidateId]);
 
     // Logging helper with timestamping
     const logTrace = (msg: string) => {
@@ -284,10 +291,12 @@ ${promptDetails}
 
     // Reconnect Deepgram WebSocket
     const reconnectDeepgram = async () => {
+        if (isReconnectingRef.current) return;
         if (deepgramLiveRef.current && (deepgramLiveRef.current.readyState === WebSocket.OPEN || deepgramLiveRef.current.readyState === WebSocket.CONNECTING)) {
             return;
         }
 
+        isReconnectingRef.current = true;
         logTrace("Connecting STT WebSocket to Deepgram...");
         try {
             const { data } = await apolloClient.mutate<any>({
@@ -302,6 +311,15 @@ ${promptDetails}
 
             ws.onopen = () => {
                 logTrace("STT WebSocket connected successfully.");
+                
+                // Flush any buffered chunks immediately on connection
+                while (audioBufferRef.current.length > 0) {
+                    const bufferedChunk = audioBufferRef.current.shift();
+                    if (bufferedChunk) {
+                        ws.send(bufferedChunk);
+                    }
+                }
+
                 if (keepAliveTimerRef.current) clearInterval(keepAliveTimerRef.current);
                 keepAliveTimerRef.current = setInterval(() => {
                     if (ws.readyState === WebSocket.OPEN) {
@@ -328,6 +346,8 @@ ${promptDetails}
             };
         } catch (err: any) {
             logTrace(`ERROR connecting STT WebSocket: ${err.message || err}`);
+        } finally {
+            isReconnectingRef.current = false;
         }
     };
 
@@ -335,21 +355,10 @@ ${promptDetails}
     const speak = async (text: string) => {
         setStatus('SPEAKING');
         isSpeakingRef.current = true;
-        const mediaRecorder = mediaRecorderRef.current;
-        const recorderWasActive = mediaRecorder?.state === 'recording';
-        if (recorderWasActive && mediaRecorder) {
-            try {
-                const stream = mediaRecorder.stream;
-                if (stream) {
-                    stream.getAudioTracks().forEach(track => {
-                        originalTrackStatesRef.current.set(track.id, track.enabled);
-                        track.enabled = false;
-                    });
-                }
-                logTrace("Muted mic tracks while Sarah is speaking to prevent self-echo in Deepgram (keeping recorder active).");
-            } catch (e) {
-                logTrace("WARNING: Could not mute mic tracks before TTS playback.");
-            }
+
+        if (speakingTimeoutRef.current) {
+            clearTimeout(speakingTimeoutRef.current);
+            speakingTimeoutRef.current = null;
         }
 
         try {
@@ -393,30 +402,31 @@ ${promptDetails}
             const audio = new Audio(audioUrl);
             activeAudioRef.current = audio;
 
+            // Fallback timeout to prevent state lockup if audio events fail
+            const safetyDuration = (text.length * 150) + 6000;
+            logTrace(`Setting speaking safety timeout for ${safetyDuration}ms`);
+            speakingTimeoutRef.current = setTimeout(() => {
+                logTrace("WARNING: Speaking safety timeout reached. Forcing transition to LISTENING.");
+                isSpeakingRef.current = false;
+                setStatus('LISTENING');
+                if (activeAudioRef.current === audio) {
+                    try {
+                        audio.pause();
+                    } catch (e) {}
+                    activeAudioRef.current = null;
+                }
+            }, safetyDuration);
+
             audio.onended = async () => {
                 logTrace("AI Audio speech track completed. Reverting to LISTENING status.");
+                if (speakingTimeoutRef.current) {
+                    clearTimeout(speakingTimeoutRef.current);
+                    speakingTimeoutRef.current = null;
+                }
                 if (activeAudioRef.current === audio) {
                     activeAudioRef.current = null;
                 }
                 isSpeakingRef.current = false;
-                if (recorderWasActive && mediaRecorder) {
-                    try {
-                        if (!deepgramLiveRef.current || deepgramLiveRef.current.readyState !== WebSocket.OPEN) {
-                            logTrace("STT WebSocket closed during TTS playback. Reconnecting...");
-                            await reconnectDeepgram();
-                        }
-                        const stream = mediaRecorder.stream;
-                        if (stream) {
-                            stream.getAudioTracks().forEach(track => {
-                                const originalState = originalTrackStatesRef.current.get(track.id);
-                                track.enabled = originalState !== undefined ? originalState : true;
-                            });
-                        }
-                        logTrace("Restored mic tracks after Sarah finished speaking.");
-                    } catch (e) {
-                        logTrace("WARNING: Could not restore mic tracks after TTS playback.");
-                    }
-                }
                 setStatus('LISTENING');
             };
 
@@ -425,19 +435,9 @@ ${promptDetails}
 
         } catch (error: any) {
             logTrace(`ERROR in TTS generation or playback: ${error.message || error}`);
-            if (recorderWasActive && mediaRecorder) {
-                try {
-                    if (!deepgramLiveRef.current || deepgramLiveRef.current.readyState !== WebSocket.OPEN) {
-                        await reconnectDeepgram();
-                    }
-                    const stream = mediaRecorder.stream;
-                    if (stream) {
-                        stream.getAudioTracks().forEach(track => {
-                            const originalState = originalTrackStatesRef.current.get(track.id);
-                            track.enabled = originalState !== undefined ? originalState : true;
-                        });
-                    }
-                } catch (e) {}
+            if (speakingTimeoutRef.current) {
+                clearTimeout(speakingTimeoutRef.current);
+                speakingTimeoutRef.current = null;
             }
             setStatus('LISTENING');
             isSpeakingRef.current = false;
@@ -525,12 +525,16 @@ ${promptDetails}
     };
 
     const saveTranscript = async (question: string, answer: string) => {
+        if (!candidateIdRef.current || candidateIdRef.current === 'guest') {
+            logTrace("Dialogue transcript save skipped (running in guest/demo mode).");
+            return;
+        }
         try {
             await apolloClient.mutate({
                 mutation: CREATE_TRANSCRIPT_MUTATION,
                 variables: {
                     jobId: jobId,
-                    candidateId: candidateId,
+                    candidateId: candidateIdRef.current,
                     userText: question,
                     aiText: answer
                 }
@@ -580,14 +584,30 @@ ${promptDetails}
 
             mediaRecorder.ondataavailable = async (event) => {
                 if (event.data.size > 0) {
-                    if (!deepgramLiveRef.current || deepgramLiveRef.current.readyState !== WebSocket.OPEN) {
-                        if (deepgramLiveRef.current?.readyState !== WebSocket.CONNECTING) {
+                    const ws = deepgramLiveRef.current;
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        // Send any buffered chunks first
+                        while (audioBufferRef.current.length > 0) {
+                            const bufferedChunk = audioBufferRef.current.shift();
+                            if (bufferedChunk) {
+                                ws.send(bufferedChunk);
+                            }
+                        }
+                        // Send current chunk
+                        ws.send(event.data);
+                    } else {
+                        // Buffer the chunk so we don't lose user speech during reconnects
+                        audioBufferRef.current.push(event.data);
+                        
+                        // Limit buffer size to prevent memory leaks
+                        if (audioBufferRef.current.length > 120) {
+                            audioBufferRef.current.shift();
+                        }
+
+                        if (!ws || ws.readyState === WebSocket.CLOSED) {
                             logTrace("STT WebSocket closed during data transmission. Reconnecting...");
                             await reconnectDeepgram();
                         }
-                    }
-                    if (deepgramLiveRef.current && deepgramLiveRef.current.readyState === WebSocket.OPEN) {
-                        deepgramLiveRef.current.send(event.data);
                     }
                 }
             };
@@ -629,6 +649,10 @@ ${promptDetails}
             if (silenceTimerRef.current) {
                 clearTimeout(silenceTimerRef.current);
                 silenceTimerRef.current = null;
+            }
+            if (speakingTimeoutRef.current) {
+                clearTimeout(speakingTimeoutRef.current);
+                speakingTimeoutRef.current = null;
             }
             if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
                 mediaRecorderRef.current.stop();

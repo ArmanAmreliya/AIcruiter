@@ -28,7 +28,8 @@ interface JobDetails {
 }
 
 export const InterviewLobby = () => {
-    const { uniqueId } = useParams<{ uniqueId: string }>();
+    const params = useParams<any>();
+    const uniqueId = params.jobId || params.uniqueId;
     const navigate = useNavigate();
     const { theme, setTheme } = useTheme();
 
