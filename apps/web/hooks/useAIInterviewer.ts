@@ -362,15 +362,19 @@ ${promptDetails}
         }
 
         try {
-            let apiUrl = '';
-            if (typeof window !== 'undefined') {
+            let apiUrl = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/graphql', '') : '';
+            if (!apiUrl && typeof window !== 'undefined') {
                 if ((window as any).NEXT_PUBLIC_API_URL) {
                     apiUrl = (window as any).NEXT_PUBLIC_API_URL.replace('/graphql', '');
-                } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                } else if (
+                    window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1' || 
+                    /^192\.168\./.test(window.location.hostname) ||
+                    /^10\./.test(window.location.hostname) ||
+                    /^172\./.test(window.location.hostname)
+                ) {
                     apiUrl = 'http://localhost:4000';
                 }
-            } else if (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_API_URL) {
-                apiUrl = process.env.NEXT_PUBLIC_API_URL.replace('/graphql', '');
             }
 
             if (!apiUrl) {
@@ -470,15 +474,19 @@ ${promptDetails}
         }
 
         try {
-            let apiUrl = '';
-            if (typeof window !== 'undefined') {
+            let apiUrl = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/graphql', '') : '';
+            if (!apiUrl && typeof window !== 'undefined') {
                 if ((window as any).NEXT_PUBLIC_API_URL) {
                     apiUrl = (window as any).NEXT_PUBLIC_API_URL.replace('/graphql', '');
-                } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                } else if (
+                    window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1' || 
+                    /^192\.168\./.test(window.location.hostname) ||
+                    /^10\./.test(window.location.hostname) ||
+                    /^172\./.test(window.location.hostname)
+                ) {
                     apiUrl = 'http://localhost:4000';
                 }
-            } else if (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_API_URL) {
-                apiUrl = process.env.NEXT_PUBLIC_API_URL.replace('/graphql', '');
             }
 
             if (!apiUrl) {
