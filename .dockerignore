@@ -1,0 +1,31 @@
+# Exclude ALL node_modules — pnpm workspace symlinks break Docker's tar checksum on Windows.
+# The Dockerfile runs pnpm install fresh inside the container.
+**/node_modules
+
+# Build artifacts that should be rebuilt inside Docker
+**/dist
+**/.turbo
+**/.next
+
+# Dev/local files not needed in image
+.env
+.env.local
+.env.production
+.git
+.gitignore
+.github
+*.md
+docs/
+scratch/
+supabase/
+playwright-report/
+test-results/
+**/tests/
+**/*.spec.ts
+**/*.test.ts
+
+# SST / CDK / Vercel local state
+.sst/
+.vercel/
+.vite/
+cdk.out/

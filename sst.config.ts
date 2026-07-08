@@ -10,10 +10,16 @@ export default {
   },
   stacks(app) {
     app.stack(function Site({ stack }) {
+      // Enforce Node.js 20 as the default runtime for all Lambda functions in this app
+      app.setDefaultFunctionProps({
+        runtime: "nodejs20.x",
+      });
+
       // 1. Create SQS queue for report worker
       const queue = new Queue(stack, "ReportQueue", {
         consumer: {
           function: {
+            runtime: "nodejs20.x",
             handler: "apps/api/src/services/report-worker.handleSQSEvent",
             environment: {
               DATABASE_URL: process.env.DATABASE_URL || "",

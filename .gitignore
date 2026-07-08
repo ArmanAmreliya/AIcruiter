@@ -42,3 +42,8 @@ playwright/.clerk/
 
 .vercel
 .env*.local
+
+# SST State
+.sst/
+.sst
+
