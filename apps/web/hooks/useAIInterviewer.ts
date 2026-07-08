@@ -60,6 +60,7 @@ export const useAIInterviewer = (
     const accumulatedTranscriptRef = useRef('');
     const activeAudioRef = useRef<HTMLAudioElement | null>(null);
     const keepAliveTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const originalTrackStatesRef = useRef<Map<string, boolean>>(new Map());
 
     // Logging helper with timestamping
     const logTrace = (msg: string) => {
@@ -338,10 +339,16 @@ ${promptDetails}
         const recorderWasActive = mediaRecorder?.state === 'recording';
         if (recorderWasActive && mediaRecorder) {
             try {
-                mediaRecorder.pause();
-                logTrace("Pausing mic capture while Sarah is speaking to prevent self-echo in Deepgram.");
+                const stream = mediaRecorder.stream;
+                if (stream) {
+                    stream.getAudioTracks().forEach(track => {
+                        originalTrackStatesRef.current.set(track.id, track.enabled);
+                        track.enabled = false;
+                    });
+                }
+                logTrace("Muted mic tracks while Sarah is speaking to prevent self-echo in Deepgram (keeping recorder active).");
             } catch (e) {
-                logTrace("WARNING: Could not pause MediaRecorder before TTS playback.");
+                logTrace("WARNING: Could not mute mic tracks before TTS playback.");
             }
         }
 
@@ -398,10 +405,16 @@ ${promptDetails}
                             logTrace("STT WebSocket closed during TTS playback. Reconnecting...");
                             await reconnectDeepgram();
                         }
-                        mediaRecorder.resume();
-                        logTrace("Resumed mic capture after Sarah finished speaking.");
+                        const stream = mediaRecorder.stream;
+                        if (stream) {
+                            stream.getAudioTracks().forEach(track => {
+                                const originalState = originalTrackStatesRef.current.get(track.id);
+                                track.enabled = originalState !== undefined ? originalState : true;
+                            });
+                        }
+                        logTrace("Restored mic tracks after Sarah finished speaking.");
                     } catch (e) {
-                        logTrace("WARNING: Could not resume MediaRecorder after TTS playback.");
+                        logTrace("WARNING: Could not restore mic tracks after TTS playback.");
                     }
                 }
                 setStatus('LISTENING');
@@ -417,7 +430,13 @@ ${promptDetails}
                     if (!deepgramLiveRef.current || deepgramLiveRef.current.readyState !== WebSocket.OPEN) {
                         await reconnectDeepgram();
                     }
-                    mediaRecorder.resume();
+                    const stream = mediaRecorder.stream;
+                    if (stream) {
+                        stream.getAudioTracks().forEach(track => {
+                            const originalState = originalTrackStatesRef.current.get(track.id);
+                            track.enabled = originalState !== undefined ? originalState : true;
+                        });
+                    }
                 } catch (e) {}
             }
             setStatus('LISTENING');
@@ -646,12 +665,12 @@ ${promptDetails}
         startInterview: startListening,
         speakWrapUp,
         toggleMic: () => {
-            if (mediaRecorderRef.current?.state === 'recording') {
-                logTrace("Muting user microphone track (pausing MediaRecorder).");
-                mediaRecorderRef.current.pause();
-            } else {
-                logTrace("Resuming user microphone track (resuming MediaRecorder).");
-                mediaRecorderRef.current?.resume();
+            const stream = mediaRecorderRef.current?.stream;
+            if (stream) {
+                stream.getAudioTracks().forEach(track => {
+                    track.enabled = !track.enabled;
+                    logTrace(`User manual toggled mic track "${track.label}" to ${track.enabled ? 'enabled' : 'disabled'}`);
+                });
             }
         }
     };
