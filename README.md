@@ -4,7 +4,7 @@ AIcruiter is a state-of-the-art **AI Voice Agent & Applicant Screening Platform*
 
 This project was built to showcase **full-stack engineering excellence, system architecture design, and performance optimizations** in high-throughput AI screening environments.
 
-![AIcruiter Recruiter Hub](docs/screenshots/Screenshot-img.png)
+![AIcruiter Recruiter Hub](apps/web/public/AIcruiter-Pic.png)
 
 ---
 
